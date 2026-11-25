@@ -971,3 +971,8 @@ $('#nuvemSair').addEventListener('click', () => Nuvem.sair());
 
 desenhar();
 Nuvem.iniciar();
+
+// Permite abrir o site sem internet (cópia guardada no dispositivo).
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
