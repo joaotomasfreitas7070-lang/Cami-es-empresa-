@@ -2,127 +2,234 @@
 <html lang="pt-PT">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Frota">
+  <meta name="theme-color" content="#1f6feb">
   <title>Gestão de Frota</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topo">
     <h1>🚚 Gestão de Frota</h1>
-    <label class="mes">
-      <span>Período</span>
-      <input type="month" id="filtroMes">
+    <div class="mes">
+      <input type="month" id="filtroMes" aria-label="Mês">
       <button type="button" id="btnTodos" class="link">Ver tudo</button>
-    </label>
+    </div>
   </header>
 
   <nav class="abas" id="abas">
     <button data-aba="painel" class="ativa">📊<span>Painel</span></button>
+    <button data-aba="viagens">🚚<span>Viagens</span></button>
     <button data-aba="abastecer">⛽<span>Abastecer</span></button>
     <button data-aba="despesas">💸<span>Despesas</span></button>
-    <button data-aba="receitas">💰<span>Receitas</span></button>
-    <button data-aba="carrinhas">🚐<span>Carrinhas</span></button>
+    <button data-aba="mais">⚙️<span>Mais</span></button>
   </nav>
 
   <main>
-    <!-- PAINEL -->
+    <!-- ================= PAINEL ================= -->
     <section id="painel" class="aba ativa">
-      <div class="cartoes">
-        <div class="cartao verde"><small>Receitas</small><strong id="totReceitas">0 €</strong></div>
-        <div class="cartao vermelho"><small>Despesas</small><strong id="totDespesas">0 €</strong></div>
-        <div class="cartao" id="cartaoLucro"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
-      </div>
-      <div class="cartoes">
-        <div class="cartao"><small>Km percorridos</small><strong id="totKm">0</strong></div>
-        <div class="cartao"><small>Média frota</small><strong id="totMedia">—</strong></div>
-        <div class="cartao"><small>Custo por km</small><strong id="totCustoKm">—</strong></div>
+      <div id="bannerCopia" class="banner" hidden>
+        💾 <span id="bannerTexto"></span>
+        <button type="button" class="btnExportar">Guardar cópia agora</button>
       </div>
 
-      <h2>Por carrinha</h2>
-      <div id="listaPainel" class="lista"></div>
+      <div class="cartoes">
+        <div class="cartao verde"><small>Receita</small><strong id="totReceita">0 €</strong></div>
+        <div class="cartao vermelho"><small>Gastos</small><strong id="totGastos">0 €</strong></div>
+        <div class="cartao"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
+      </div>
+      <div class="cartoes">
+        <div class="cartao"><small>Km (vazio)</small><strong id="totKm">0</strong></div>
+        <div class="cartao"><small>Média gasóleo</small><strong id="totMedia">—</strong></div>
+        <div class="cartao"><small>€ / km carregado</small><strong id="totPrecoKm">—</strong></div>
+      </div>
 
-      <h2>Despesas por categoria</h2>
+      <h2>Resultado <span id="tituloPeriodo"></span></h2>
+      <div id="resultado" class="resultado"></div>
+
+      <div id="blocoSemanas">
+        <h2>Por semana</h2>
+        <div class="tabela-wrap"><table class="tabela" id="tabelaSemanas"></table></div>
+      </div>
+
+      <div id="blocoCarrinhas">
+        <h2>Por carrinha</h2>
+        <div id="listaPainel" class="lista"></div>
+      </div>
+
+      <h2>Para onde vai o dinheiro</h2>
       <div id="categoriasPainel" class="barras"></div>
-
-      <h2>Cópia de segurança</h2>
-      <p class="ajuda">Os dados ficam guardados neste dispositivo. Faça cópias regularmente.</p>
-      <div class="botoes">
-        <button type="button" id="btnExportar">⬇️ Guardar cópia</button>
-        <label class="botao">⬆️ Carregar cópia<input type="file" id="ficheiroImportar" accept=".json" hidden></label>
-        <button type="button" id="btnCsv">📄 Exportar Excel (CSV)</button>
-      </div>
     </section>
 
-    <!-- ABASTECER -->
+    <!-- ================= VIAGENS ================= -->
+    <section id="viagens" class="aba">
+      <form id="formViagens" class="formulario">
+        <h2 class="tituloForm" data-novo="Nova viagem">Nova viagem</h2>
+        <div class="grid2">
+          <label>Data<input type="date" name="data" required></label>
+          <label>Carrinha<select name="carrinhaId" class="selCarrinha semCarrinha"></select></label>
+        </div>
+        <label>Cliente<input type="text" name="cliente" placeholder="nome do cliente" list="sugClientes"></label>
+        <div class="grid2">
+          <label>Origem (carga)<input type="text" name="origem" placeholder="ex: Vila Real" list="sugLocais"></label>
+          <label>Destino (descarga)<input type="text" name="destino" placeholder="ex: Lisboa" list="sugLocais"></label>
+        </div>
+        <div class="grid2">
+          <label>Km carregado<input type="number" name="kmCarregado" min="0" step="1" inputmode="numeric"></label>
+          <label>Km em vazio<input type="number" name="kmVazio" min="0" step="1" inputmode="numeric"></label>
+        </div>
+        <label>Receita / preço acordado (€)<input type="number" name="receita" min="0" step="0.01" inputmode="decimal" required></label>
+        <div class="grid3">
+          <label>Portagens (€)<input type="number" name="portagens" min="0" step="0.01" inputmode="decimal"></label>
+          <label>Comida (€)<input type="number" name="alimentacao" min="0" step="0.01" inputmode="decimal"></label>
+          <label>Outros (€)<input type="number" name="outros" min="0" step="0.01" inputmode="decimal"></label>
+        </div>
+        <div class="grid2">
+          <label>Nº fatura<input type="text" name="fatura"></label>
+          <label>Pagamento
+            <select name="estado"><option>Pendente</option><option>Pago</option></select>
+          </label>
+        </div>
+        <label>Notas<input type="text" name="notas"></label>
+
+        <div id="previewViagem" class="preview"></div>
+        <p class="ajuda">O gasóleo de cada viagem é estimado pelos km e pela média real das suas carrinhas (ou pelos Parâmetros).
+          Também pode usar este formulário para ver se uma carga compensa antes de a aceitar.</p>
+        <button type="submit" class="principal">Guardar viagem</button>
+        <button type="button" class="cancelar" hidden>Cancelar edição</button>
+      </form>
+      <datalist id="sugClientes"></datalist>
+      <datalist id="sugLocais"></datalist>
+      <h2>Viagens</h2>
+      <div id="listaViagens" class="lista"></div>
+    </section>
+
+    <!-- ================= ABASTECER ================= -->
     <section id="abastecer" class="aba">
       <form id="formAbastecer" class="formulario">
-        <h2>Novo abastecimento</h2>
-        <label>Carrinha<select name="carrinhaId" class="selCarrinha" required></select></label>
-        <label>Data<input type="date" name="data" required></label>
+        <h2 class="tituloForm" data-novo="Novo abastecimento">Novo abastecimento</h2>
+        <div class="grid2">
+          <label>Data<input type="date" name="data" required></label>
+          <label>Carrinha<select name="carrinhaId" class="selCarrinha" required></select></label>
+        </div>
         <label>Km no conta-quilómetros<input type="number" name="km" min="0" step="1" inputmode="numeric" required></label>
-        <label>Litros<input type="number" name="litros" min="0" step="0.01" inputmode="decimal" required></label>
-        <label>Valor pago (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
-        <p class="ajuda">Dica: ateste sempre o depósito para a média ficar certa.</p>
+        <div class="grid2">
+          <label>Litros<input type="number" name="litros" min="0" step="0.01" inputmode="decimal" required></label>
+          <label>Valor pago (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
+        </div>
+        <p class="ajuda">Ateste sempre o depósito para a média ficar certa. O valor pago conta como gasto de gasóleo do mês.</p>
         <button type="submit" class="principal">Guardar</button>
+        <button type="button" class="cancelar" hidden>Cancelar edição</button>
       </form>
       <h2>Abastecimentos</h2>
       <div id="listaAbastecer" class="lista"></div>
     </section>
 
-    <!-- DESPESAS -->
+    <!-- ================= DESPESAS ================= -->
     <section id="despesas" class="aba">
       <form id="formDespesas" class="formulario">
-        <h2>Nova despesa</h2>
+        <h2 class="tituloForm" data-novo="Nova despesa">Nova despesa</h2>
         <label>Categoria
           <select name="categoria" required>
-            <option>Manutenção</option>
-            <option>Pneus</option>
-            <option>Portagens</option>
-            <option>Seguro</option>
-            <option>Salários</option>
-            <option>Impostos</option>
-            <option>Estacionamento</option>
-            <option>Lavagem</option>
-            <option>Multas</option>
-            <option>Outros</option>
+            <optgroup label="Sai da reserva de manutenção">
+              <option>Manutenção / revisão</option>
+              <option>Pneus</option>
+              <option>Avaria / reparação</option>
+            </optgroup>
+            <optgroup label="Outros gastos">
+              <option>Lavagem</option>
+              <option>Estacionamento</option>
+              <option>Multas</option>
+              <option>Equipamento</option>
+              <option>Outros</option>
+            </optgroup>
           </select>
         </label>
-        <label>Carrinha<select name="carrinhaId" class="selCarrinha comGeral"></select></label>
-        <label>Data<input type="date" name="data" required></label>
+        <div class="grid2">
+          <label>Data<input type="date" name="data" required></label>
+          <label>Carrinha<select name="carrinhaId" class="selCarrinha comGeral"></select></label>
+        </div>
         <label>Valor (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
-        <label>Descrição<input type="text" name="descricao" placeholder="ex: troca de óleo"></label>
-        <p class="ajuda">O combustível é contado automaticamente a partir dos abastecimentos.</p>
+        <label>Descrição<input type="text" name="descricao" placeholder="ex: troca de óleo e filtros"></label>
+        <p class="ajuda">Seguros, contabilista, IUC, etc. vão em <b>⚙️ Mais → Custos fixos</b> (entram todos os meses sozinhos).
+          Manutenção, pneus e avarias são pagos pela reserva de manutenção, por isso não contam a dobrar no lucro.</p>
         <button type="submit" class="principal">Guardar</button>
+        <button type="button" class="cancelar" hidden>Cancelar edição</button>
       </form>
       <h2>Despesas</h2>
       <div id="listaDespesas" class="lista"></div>
     </section>
 
-    <!-- RECEITAS -->
-    <section id="receitas" class="aba">
-      <form id="formReceitas" class="formulario">
-        <h2>Nova receita (serviço)</h2>
-        <label>Cliente<input type="text" name="cliente" required placeholder="nome do cliente"></label>
-        <label>Carrinha<select name="carrinhaId" class="selCarrinha comGeral"></select></label>
-        <label>Data<input type="date" name="data" required></label>
-        <label>Valor (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
-        <label>Descrição<input type="text" name="descricao" placeholder="ex: entrega Lisboa → Porto"></label>
-        <button type="submit" class="principal">Guardar</button>
-      </form>
-      <h2>Receitas</h2>
-      <div id="listaReceitas" class="lista"></div>
-    </section>
+    <!-- ================= MAIS ================= -->
+    <section id="mais" class="aba">
+      <h2>💾 Os seus dados</h2>
+      <div class="caixa">
+        <p>Tudo o que escreve fica guardado <b>dentro do navegador deste telemóvel</b> (não vai para a internet nem para o GitHub).
+          Por isso:</p>
+        <ul>
+          <li>Adicione o site ao ecrã principal (Safari → Partilhar → <i>Adicionar ao ecrã principal</i>) e abra-o sempre por esse ícone.</li>
+          <li>Não apague os dados de navegação do Safari.</li>
+          <li>Guarde uma cópia regularmente (ex: no fim de cada semana) para o iCloud Drive ou envie por email para si.</li>
+        </ul>
+        <p class="ajuda" id="infoUltimaCopia"></p>
+        <div class="botoes">
+          <button type="button" class="btnExportar">⬇️ Guardar cópia</button>
+          <label class="botao">⬆️ Carregar cópia<input type="file" id="ficheiroImportar" accept=".json,application/json" hidden></label>
+        </div>
+        <div class="botoes">
+          <button type="button" id="btnCsvViagens">📄 Viagens para Excel</button>
+          <button type="button" id="btnCsvGastos">📄 Gastos para Excel</button>
+        </div>
+      </div>
 
-    <!-- CARRINHAS -->
-    <section id="carrinhas" class="aba">
+      <h2>🚐 Carrinhas</h2>
       <form id="formCarrinhas" class="formulario">
-        <h2>Nova carrinha</h2>
-        <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA"></label>
-        <label>Modelo / nome<input type="text" name="modelo" placeholder="ex: Renault Master"></label>
-        <button type="submit" class="principal">Adicionar</button>
+        <div class="grid2">
+          <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA"></label>
+          <label>Modelo<input type="text" name="modelo" placeholder="ex: Sprinter"></label>
+        </div>
+        <button type="submit" class="principal">Adicionar carrinha</button>
       </form>
-      <h2>As minhas carrinhas</h2>
-      <div id="listaCarrinhas" class="lista"></div>
+      <div id="listaCarrinhas" class="lista espaco"></div>
+
+      <h2>🧾 Custos fixos</h2>
+      <p class="ajuda">Entram em todos os meses, mesmo com poucas viagens. Se um custo for anual, escolha "Anual" e é dividido por 12.</p>
+      <div id="listaFixos" class="lista espaco"></div>
+      <div class="botoes espaco">
+        <button type="button" id="btnNovoFixo">➕ Adicionar custo fixo</button>
+      </div>
+      <p class="total-fixos">Total por mês: <b id="totalFixos">0 €</b></p>
+
+      <h2>🎯 Parâmetros</h2>
+      <form id="formParametros" class="formulario">
+        <div class="grid2">
+          <label>Preço objetivo (€/km carregado)<input type="number" name="precoObjetivo" step="0.01" inputmode="decimal"></label>
+          <label>Reserva manutenção (€/km)<input type="number" name="reserva" step="0.01" inputmode="decimal"></label>
+        </div>
+        <div class="grid2">
+          <label>Consumo previsto (L/100km)<input type="number" name="consumo" step="0.1" inputmode="decimal"></label>
+          <label>Preço do gasóleo (€/L)<input type="number" name="precoGasoleo" step="0.001" inputmode="decimal"></label>
+        </div>
+        <p class="ajuda">O consumo e o preço só são usados enquanto não houver abastecimentos registados.</p>
+        <h3>Ordenado</h3>
+        <label>Ordenado líquido que quer (€)<input type="number" name="ordenado" step="1" inputmode="decimal"></label>
+        <div class="grid3">
+          <label>SS trabalhador (%)<input type="number" name="ss" step="0.01" inputmode="decimal"></label>
+          <label>IRS retido (%)<input type="number" name="irs" step="0.01" inputmode="decimal"></label>
+          <label>Encargos empresa (%)<input type="number" name="encargos" step="0.001" inputmode="decimal"></label>
+        </div>
+        <label>Subsídios de férias e Natal
+          <select name="subsidios"><option value="1">14 pagamentos</option><option value="0">Em duodécimos (12)</option></select>
+        </label>
+        <p class="ajuda">Custo mensal do ordenado para a empresa: <b id="custoOrdenado">—</b></p>
+      </form>
+
+      <h2>⚠️ Zona perigosa</h2>
+      <div class="botoes espaco">
+        <button type="button" id="btnApagarTudo" class="perigo">Apagar todos os dados</button>
+      </div>
     </section>
   </main>
 

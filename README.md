@@ -1,19 +1,18 @@
 # Gestão de Frota
 
-Site simples para gerir a empresa de transportes: carrinhas, abastecimentos (média L/100km), despesas, receitas e lucro.
+Site simples para gerir a empresa de transportes. Substitui as folhas Excel de controlo mensal.
 
-## Como usar
-1. Abra o `index.html` no navegador (computador ou telemóvel). Não precisa de instalar nada.
-2. **🚐 Carrinhas** – adicione as carrinhas (matrícula e modelo).
-3. **⛽ Abastecer** – registe cada abastecimento com os km do conta-quilómetros, litros e valor.
-   A média é calculada a partir do abastecimento anterior (ateste sempre o depósito).
-4. **💸 Despesas** – manutenção, pneus, portagens, seguros, salários… (por carrinha ou "Geral").
-5. **💰 Receitas** – serviços/fretes feitos a clientes.
-6. **📊 Painel** – receitas, despesas, lucro, km, média e custo por km do mês escolhido, por carrinha.
+## Separadores
+- **📊 Painel** – resultado do mês igual ao Excel: receita − gasóleo − portagens − comida − custos fixos − reserva de manutenção
+  = lucro antes do ordenado; depois o custo do ordenado, sobra/falta, ordenado que a empresa aguenta, faturas por cobrar,
+  resumo por semana (segunda a domingo) e por carrinha.
+- **🚚 Viagens** – uma linha por viagem (cliente, origem → destino, km carregado/vazio, receita, portagens, comida, outros,
+  nº fatura, estado). Mostra logo o preço por km, o preço mínimo, o lucro e a avaliação (OK / Abaixo do objetivo / PREJUÍZO).
+  Toque em "Por cobrar" para marcar como pago. ✏️ para editar.
+- **⛽ Abastecer** – km do conta-quilómetros, litros e valor → média L/100km real. O gasóleo das viagens é estimado com esta média.
+- **💸 Despesas** – manutenção, pneus e avarias (saem da reserva) e outros gastos.
+- **⚙️ Mais** – cópias de segurança, exportar para Excel, carrinhas, custos fixos e parâmetros (preço objetivo, reserva, ordenado…).
 
-## Importante
-Os dados ficam guardados no navegador do dispositivo. Use **Guardar cópia** no Painel com regularidade
-e **Carregar cópia** para passar os dados para outro dispositivo. **Exportar Excel (CSV)** abre no Excel.
-
-## Publicar online (opcional)
-Pode ativar o GitHub Pages neste repositório (Settings → Pages) para aceder pelo link no telemóvel.
+## Onde ficam os dados
+No navegador do dispositivo (localStorage). Não vão para a internet. Adicione o site ao ecrã principal,
+não apague os dados do Safari e use **Guardar cópia** regularmente.
