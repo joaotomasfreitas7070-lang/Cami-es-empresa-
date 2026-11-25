@@ -299,3 +299,6 @@ button.badge { border: 0; cursor: pointer; padding: 4px 10px; }
 @media (min-width: 900px) {
   .formulario { max-width: 560px; }
 }
+
+#caixaNuvem form { padding: 0; }
+#caixaNuvem h3 { margin-top: 14px; }

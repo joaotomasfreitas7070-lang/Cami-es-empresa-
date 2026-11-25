@@ -781,6 +781,8 @@ $('#btnApagarTudo').addEventListener('click', () => {
 /* ================= Internet (Supabase) ================= */
 const Nuvem = {
   cliente: null, user: null, timer: null, aEnviar: false, estado: '', erro: '',
+  recuperacao: /type=recovery/.test(location.hash), // veio do link do email de recuperação
+  CH_EMAIL: 'frota-ultimo-email',
 
   configurado() {
     const c = window.FROTA_NUVEM || {};
@@ -794,7 +796,9 @@ const Nuvem = {
     this.cliente.auth.onAuthStateChange((evento, sessao) => {
       const antes = this.user?.id;
       this.user = sessao?.user || null;
-      if (evento === 'PASSWORD_RECOVERY') setTimeout(() => this.novaSenha(), 300);
+      if (evento === 'PASSWORD_RECOVERY') this.recuperacao = true;
+      if (this.user?.email) { try { localStorage.setItem(this.CH_EMAIL, this.user.email); } catch (e) { /* */ } }
+      if (this.recuperacao && this.user) setTimeout(() => this.mostrarNovaSenha(true), 200);
       if (this.user && this.user.id !== antes) setTimeout(() => this.sincronizar(), 0);
       this.ui(); desenharPainel();
     });
@@ -913,17 +917,49 @@ const Nuvem = {
     if (!data.session) alert('Conta criada! Abra o email que recebeu e toque no link de confirmação. Depois volte aqui e toque em Entrar.');
   },
 
+  ultimoEmail() { try { return localStorage.getItem(this.CH_EMAIL) || ''; } catch (e) { return ''; } },
+
   async esqueci(email) {
-    if (!email) return aviso('Escreva primeiro o seu email.');
-    const { error } = await this.cliente.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
-    aviso(error ? '❌ ' + error.message : '📧 Enviámos um email para criar uma nova palavra-passe.');
+    if (!email) { aviso('Escreva primeiro o seu email (em cima).'); $('#nuvemEntrar').elements.email.focus(); return; }
+    const { error } = await this.cliente.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+    if (error) {
+      aviso(/rate|seconds|limit/i.test(error.message) ? '⏳ Já foi pedido há pouco. Espere uns minutos e tente outra vez.' : '❌ ' + error.message);
+      return;
+    }
+    alert(`📧 Enviámos um email para ${email}.\n\n1. Abra o email (veja também no Spam).\n2. Toque no link "Reset Password".\n` +
+      `3. O site abre e pede a nova palavra-passe.\n\nSe não chegar nada em 5 minutos, confirme se o email está certo.`);
   },
 
-  async novaSenha() {
-    const nova = prompt('Escreva a nova palavra-passe (mínimo 6 caracteres):');
-    if (!nova) return;
+  ajudaEmail() {
+    const box = $('#ajudaEmail');
+    const ultimo = this.ultimoEmail();
+    box.innerHTML = (ultimo ? `Neste dispositivo a última conta usada foi <b>${esc(ultimo)}</b>.<br><br>` : '') +
+      `Se não se lembrar do email:<br>• Procure no seu email uma mensagem do <b>Supabase</b> ("Confirm your signup"): foi enviada para o email da conta.<br>` +
+      `• Ou entre em <b>supabase.com</b> (com o GitHub) → o seu projeto → <b>Authentication → Users</b>: aparecem todos os emails com conta.<br>` +
+      `• Se perdeu o acesso ao próprio Gmail, recupere-o primeiro em <b>g.co/recover</b>.`;
+    box.hidden = !box.hidden;
+    if (ultimo && !$('#nuvemEntrar').elements.email.value) $('#nuvemEntrar').elements.email.value = ultimo;
+  },
+
+  mostrarNovaSenha(veioDoEmail) {
+    $('#novaSenhaTitulo').textContent = veioDoEmail ? '🔑 Escolha a nova palavra-passe' : '🔑 Mudar palavra-passe';
+    $('#nuvemNovaSenha').hidden = false;
+    $('#abas button[data-aba="mais"]').click();
+    setTimeout(() => { $('#nuvemNovaSenha').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#nuvemNovaSenha').elements.senha.focus(); }, 250);
+  },
+
+  async guardarNovaSenha(nova, confirmar) {
+    if (nova !== confirmar) { aviso('❌ As duas palavras-passe não são iguais.'); return; }
     const { error } = await this.cliente.auth.updateUser({ password: nova });
-    aviso(error ? '❌ ' + error.message : '✅ Palavra-passe alterada');
+    if (error) {
+      aviso(/different|same/i.test(error.message) ? '❌ Tem de ser diferente da anterior.' : /session|auth/i.test(error.message)
+        ? '❌ O link expirou. Peça outro em "Esqueci-me da palavra-passe".' : '❌ ' + error.message);
+      return;
+    }
+    this.recuperacao = false;
+    $('#nuvemNovaSenha').reset(); $('#nuvemNovaSenha').hidden = true;
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    alert('✅ Palavra-passe alterada! Use a nova palavra-passe da próxima vez que entrar (também no ícone do ecrã principal).');
   },
 
   async sair() {
@@ -934,6 +970,12 @@ const Nuvem = {
 
   ui() {
     const cfg = this.configurado();
+    const ultimo = this.ultimoEmail();
+    $('#ultimoEmail').hidden = !ultimo || !!this.user;
+    $('#ultimoEmail').innerHTML = ultimo ? `Última conta neste dispositivo: <b>${esc(ultimo)}</b>` : '';
+    const campoEmail = $('#nuvemEntrar').elements.email;
+    if (ultimo && !campoEmail.value && document.activeElement !== campoEmail) campoEmail.value = ultimo;
+    if (!this.user) $('#nuvemNovaSenha').hidden = true;
     $('#nuvemSemConfig').hidden = cfg;
     $('#nuvemEntrar').hidden = !cfg || !!this.user;
     $('#nuvemLigado').hidden = !this.user;
@@ -966,6 +1008,14 @@ $('#nuvemCriar').addEventListener('click', () => {
   Nuvem.criar(form.elements.email.value.trim(), form.elements.senha.value);
 });
 $('#nuvemEsqueci').addEventListener('click', () => Nuvem.esqueci($('#nuvemEntrar').elements.email.value.trim()));
+$('#nuvemSemEmail').addEventListener('click', () => Nuvem.ajudaEmail());
+$('#nuvemMudarSenha').addEventListener('click', () => Nuvem.mostrarNovaSenha(false));
+$('#novaSenhaCancelar').addEventListener('click', () => { Nuvem.recuperacao = false; $('#nuvemNovaSenha').reset(); $('#nuvemNovaSenha').hidden = true; });
+$('#nuvemNovaSenha').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  Nuvem.guardarNovaSenha(f.senha, f.confirmar);
+});
 $('#nuvemSync').addEventListener('click', () => Nuvem.sincronizar());
 $('#nuvemSair').addEventListener('click', () => Nuvem.sair());
 

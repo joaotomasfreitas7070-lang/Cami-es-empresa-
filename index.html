@@ -205,18 +205,31 @@
         <form id="nuvemEntrar" hidden>
           <p>Entre com a sua conta para guardar tudo na internet e ver os mesmos dados no telemóvel e no computador.</p>
           <label>Email<input type="email" name="email" autocomplete="username" required></label>
+          <p class="ajuda" id="ultimoEmail" hidden></p>
           <label>Palavra-passe<input type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
           <button type="submit" class="principal">Entrar</button>
           <div class="botoes espaco">
             <button type="button" id="nuvemCriar">Criar conta</button>
-            <button type="button" id="nuvemEsqueci" class="link">Esqueci-me da palavra-passe</button>
           </div>
+          <div class="botoes espaco">
+            <button type="button" id="nuvemEsqueci" class="link">🔑 Esqueci-me da palavra-passe</button>
+            <button type="button" id="nuvemSemEmail" class="link">✉️ Não sei qual era o email</button>
+          </div>
+          <div id="ajudaEmail" class="preview" hidden></div>
+        </form>
+        <form id="nuvemNovaSenha" hidden>
+          <h3 id="novaSenhaTitulo">🔑 Escolha a nova palavra-passe</h3>
+          <label>Nova palavra-passe<input type="password" name="senha" autocomplete="new-password" minlength="6" required></label>
+          <label>Repita a palavra-passe<input type="password" name="confirmar" autocomplete="new-password" minlength="6" required></label>
+          <button type="submit" class="principal">Guardar nova palavra-passe</button>
+          <button type="button" class="cancelar" id="novaSenhaCancelar">Cancelar</button>
         </form>
         <div id="nuvemLigado" hidden>
           <p>✅ Ligado como <b id="nuvemEmail"></b></p>
           <p class="ajuda" id="nuvemInfo"></p>
           <div class="botoes espaco">
             <button type="button" id="nuvemSync">🔄 Sincronizar agora</button>
+            <button type="button" id="nuvemMudarSenha">🔑 Mudar palavra-passe</button>
             <button type="button" id="nuvemSair">Sair</button>
           </div>
         </div>
