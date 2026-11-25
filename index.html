@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestão de Frota</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topo">
+    <h1>🚚 Gestão de Frota</h1>
+    <label class="mes">
+      <span>Período</span>
+      <input type="month" id="filtroMes">
+      <button type="button" id="btnTodos" class="link">Ver tudo</button>
+    </label>
+  </header>
+
+  <nav class="abas" id="abas">
+    <button data-aba="painel" class="ativa">📊<span>Painel</span></button>
+    <button data-aba="abastecer">⛽<span>Abastecer</span></button>
+    <button data-aba="despesas">💸<span>Despesas</span></button>
+    <button data-aba="receitas">💰<span>Receitas</span></button>
+    <button data-aba="carrinhas">🚐<span>Carrinhas</span></button>
+  </nav>
+
+  <main>
+    <!-- PAINEL -->
+    <section id="painel" class="aba ativa">
+      <div class="cartoes">
+        <div class="cartao verde"><small>Receitas</small><strong id="totReceitas">0 €</strong></div>
+        <div class="cartao vermelho"><small>Despesas</small><strong id="totDespesas">0 €</strong></div>
+        <div class="cartao" id="cartaoLucro"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
+      </div>
+      <div class="cartoes">
+        <div class="cartao"><small>Km percorridos</small><strong id="totKm">0</strong></div>
+        <div class="cartao"><small>Média frota</small><strong id="totMedia">—</strong></div>
+        <div class="cartao"><small>Custo por km</small><strong id="totCustoKm">—</strong></div>
+      </div>
+
+      <h2>Por carrinha</h2>
+      <div id="listaPainel" class="lista"></div>
+
+      <h2>Despesas por categoria</h2>
+      <div id="categoriasPainel" class="barras"></div>
+
+      <h2>Cópia de segurança</h2>
+      <p class="ajuda">Os dados ficam guardados neste dispositivo. Faça cópias regularmente.</p>
+      <div class="botoes">
+        <button type="button" id="btnExportar">⬇️ Guardar cópia</button>
+        <label class="botao">⬆️ Carregar cópia<input type="file" id="ficheiroImportar" accept=".json" hidden></label>
+        <button type="button" id="btnCsv">📄 Exportar Excel (CSV)</button>
+      </div>
+    </section>
+
+    <!-- ABASTECER -->
+    <section id="abastecer" class="aba">
+      <form id="formAbastecer" class="formulario">
+        <h2>Novo abastecimento</h2>
+        <label>Carrinha<select name="carrinhaId" class="selCarrinha" required></select></label>
+        <label>Data<input type="date" name="data" required></label>
+        <label>Km no conta-quilómetros<input type="number" name="km" min="0" step="1" inputmode="numeric" required></label>
+        <label>Litros<input type="number" name="litros" min="0" step="0.01" inputmode="decimal" required></label>
+        <label>Valor pago (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
+        <p class="ajuda">Dica: ateste sempre o depósito para a média ficar certa.</p>
+        <button type="submit" class="principal">Guardar</button>
+      </form>
+      <h2>Abastecimentos</h2>
+      <div id="listaAbastecer" class="lista"></div>
+    </section>
+
+    <!-- DESPESAS -->
+    <section id="despesas" class="aba">
+      <form id="formDespesas" class="formulario">
+        <h2>Nova despesa</h2>
+        <label>Categoria
+          <select name="categoria" required>
+            <option>Manutenção</option>
+            <option>Pneus</option>
+            <option>Portagens</option>
+            <option>Seguro</option>
+            <option>Salários</option>
+            <option>Impostos</option>
+            <option>Estacionamento</option>
+            <option>Lavagem</option>
+            <option>Multas</option>
+            <option>Outros</option>
+          </select>
+        </label>
+        <label>Carrinha<select name="carrinhaId" class="selCarrinha comGeral"></select></label>
+        <label>Data<input type="date" name="data" required></label>
+        <label>Valor (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
+        <label>Descrição<input type="text" name="descricao" placeholder="ex: troca de óleo"></label>
+        <p class="ajuda">O combustível é contado automaticamente a partir dos abastecimentos.</p>
+        <button type="submit" class="principal">Guardar</button>
+      </form>
+      <h2>Despesas</h2>
+      <div id="listaDespesas" class="lista"></div>
+    </section>
+
+    <!-- RECEITAS -->
+    <section id="receitas" class="aba">
+      <form id="formReceitas" class="formulario">
+        <h2>Nova receita (serviço)</h2>
+        <label>Cliente<input type="text" name="cliente" required placeholder="nome do cliente"></label>
+        <label>Carrinha<select name="carrinhaId" class="selCarrinha comGeral"></select></label>
+        <label>Data<input type="date" name="data" required></label>
+        <label>Valor (€)<input type="number" name="valor" min="0" step="0.01" inputmode="decimal" required></label>
+        <label>Descrição<input type="text" name="descricao" placeholder="ex: entrega Lisboa → Porto"></label>
+        <button type="submit" class="principal">Guardar</button>
+      </form>
+      <h2>Receitas</h2>
+      <div id="listaReceitas" class="lista"></div>
+    </section>
+
+    <!-- CARRINHAS -->
+    <section id="carrinhas" class="aba">
+      <form id="formCarrinhas" class="formulario">
+        <h2>Nova carrinha</h2>
+        <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA"></label>
+        <label>Modelo / nome<input type="text" name="modelo" placeholder="ex: Renault Master"></label>
+        <button type="submit" class="principal">Adicionar</button>
+      </form>
+      <h2>As minhas carrinhas</h2>
+      <div id="listaCarrinhas" class="lista"></div>
+    </section>
+  </main>
+
+  <div id="aviso" class="aviso" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
