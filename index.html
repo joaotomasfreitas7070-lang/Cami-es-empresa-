@@ -5,14 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Frota">
-  <meta name="theme-color" content="#1f6feb">
-  <title>Gestão de Frota</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Freitas">
+  <meta name="theme-color" content="#0d0f12">
+  <title>Transportes Freitas</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topo">
-    <h1>🚚 Gestão de Frota <button type="button" id="estadoNuvem" class="estado-nuvem" hidden></button></h1>
+    <div class="marca">
+      <img src="img/logo-128.png" alt="" width="46" height="46">
+      <div class="marca-texto"><small>Transportes</small><strong>FREITAS</strong></div>
+      <button type="button" id="estadoNuvem" class="estado-nuvem" hidden></button>
+    </div>
     <div class="mes">
       <button type="button" id="mesAnt" class="seta" aria-label="Mês anterior">◀</button>
       <input type="month" id="filtroMes" aria-label="Mês">
@@ -22,11 +33,11 @@
   </header>
 
   <nav class="abas" id="abas">
-    <button data-aba="painel" class="ativa">📊<span>Painel</span></button>
-    <button data-aba="viagens">🚚<span>Viagens</span></button>
-    <button data-aba="abastecer">⛽<span>Abastecer</span></button>
-    <button data-aba="despesas">💸<span>Despesas</span></button>
-    <button data-aba="mais">⚙️<span>Mais</span></button>
+    <button data-aba="painel" class="ativa"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Painel</span></button>
+    <button data-aba="viagens"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg><span>Viagens</span></button>
+    <button data-aba="abastecer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 8h6M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Abastecer</span></button>
+    <button data-aba="despesas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg><span>Despesas</span></button>
+    <button data-aba="mais"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Mais</span></button>
   </nav>
 
   <main>
@@ -37,11 +48,19 @@
         <button type="button" class="btnExportar">Guardar cópia agora</button>
       </div>
 
+      <div id="blocoAvisos" hidden>
+        <div id="listaAvisos" class="avisos"></div>
+      </div>
+
       <div class="cartoes">
         <div class="cartao verde"><small>Receita</small><strong id="totReceita">0 €</strong></div>
         <div class="cartao vermelho"><small>Gastos</small><strong id="totGastos">0 €</strong></div>
-        <div class="cartao"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
+        <div class="cartao destaque"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
       </div>
+      <div id="blocoAvisos" hidden>
+        <div id="listaAvisos" class="avisos"></div>
+      </div>
+
       <div class="cartoes">
         <div class="cartao"><small>Km (vazio)</small><strong id="totKm">0</strong></div>
         <div class="cartao"><small>Média gasóleo</small><strong id="totMedia">—</strong></div>
@@ -205,7 +224,7 @@
       <div class="caixa">
         <p>Tudo o que escreve fica sempre guardado <b>neste dispositivo</b> (funciona sem internet).
           Com a conta da internet ligada (acima), também fica guardado na internet. Sem ela:</p>
-        <ul>
+        <ul id="dicasLocal">
           <li>Adicione o site ao ecrã principal (Safari → Partilhar → <i>Adicionar ao ecrã principal</i>) e abra-o sempre por esse ícone.</li>
           <li>Não apague os dados de navegação do Safari.</li>
           <li>Guarde uma cópia regularmente (ex: no fim de cada semana) para o iCloud Drive ou envie por email para si.</li>
@@ -222,14 +241,28 @@
       </div>
 
       <h2>🚐 Carrinhas</h2>
-      <form id="formCarrinhas" class="formulario">
-        <div class="grid2">
-          <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA"></label>
-          <label>Modelo<input type="text" name="modelo" placeholder="ex: Sprinter"></label>
-        </div>
-        <button type="submit" class="principal">Adicionar carrinha</button>
-      </form>
       <div id="listaCarrinhas" class="lista espaco"></div>
+      <form id="formCarrinhas" class="formulario">
+        <h3 class="tituloForm" data-novo="Adicionar carrinha">Adicionar carrinha</h3>
+        <div class="grid2">
+          <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA" autocapitalize="characters"></label>
+          <label>Modelo<input type="text" name="modelo" list="sugModelos" placeholder="escolha ou escreva"></label>
+        </div>
+        <datalist id="sugModelos">
+          <option value="Citroën Berlingo Van XL"><option value="Peugeot Partner Long">
+        </datalist>
+        <p class="ajuda">Datas e revisão (opcional): o painel avisa 30 dias antes de terminar e 1 500 km antes da revisão.</p>
+        <div class="grid2">
+          <label>Seguro válido até<input type="date" name="seguro"></label>
+          <label>Inspeção (IPO) até<input type="date" name="inspecao"></label>
+        </div>
+        <div class="grid2">
+          <label>IUC pagar até<input type="date" name="iuc"></label>
+          <label>Próxima revisão aos (km)<input type="number" name="revisaoKm" min="0" step="1" inputmode="numeric"></label>
+        </div>
+        <button type="submit" class="principal">Guardar carrinha</button>
+        <button type="button" class="cancelar" hidden>Cancelar edição</button>
+      </form>
 
       <h2>🧾 Custos fixos</h2>
       <p class="ajuda">Entram em todos os meses, mesmo com poucas viagens. Se um custo for anual, escolha "Anual" e é dividido por 12.</p>

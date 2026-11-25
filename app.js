@@ -4,7 +4,7 @@
 const CHAVE = 'gestao-frota-v1';
 
 const PARAMETROS_BASE = {
-  precoObjetivo: 0.85, reserva: 0.10, consumo: 11, precoGasoleo: 2.10,
+  precoObjetivo: 0.85, reserva: 0.10, consumo: 7, precoGasoleo: 2.10,
   ordenado: 1000, ss: 11, irs: 15, encargos: 25.675, subsidios: '1',
 };
 const FIXOS_BASE = [
@@ -235,7 +235,49 @@ function linhaR(rotulo, valor, extra = '') {
   return `<div class="r ${extra}"><span>${rotulo}</span><b>${valor}</b></div>`;
 }
 
+// Km atual de uma carrinha (último registo do conta-quilómetros).
+function kmAtual(id) {
+  const kms = dados.abastecimentos.filter((a) => a.carrinhaId === id).map((a) => N(a.km));
+  return kms.length ? Math.max(...kms) : null;
+}
+
+// Estado dos documentos e da revisão de uma carrinha.
+const DOCS = [['seguro', 'Seguro'], ['inspecao', 'Inspeção'], ['iuc', 'IUC']];
+function estadoDocs(c) {
+  const out = [];
+  const hoje = new Date(hojeISO());
+  DOCS.forEach(([campo, nome]) => {
+    if (!c[campo]) return;
+    const dias = Math.round((new Date(c[campo]) - hoje) / 864e5);
+    if (dias < 0) out.push({ cls: 'mau', txt: `${nome} expirou há ${-dias} dia${dias === -1 ? '' : 's'}`, alerta: true });
+    else if (dias <= 30) out.push({ cls: 'medio', txt: `${nome} termina em ${dias} dia${dias === 1 ? '' : 's'} (${dataPT(c[campo])})`, alerta: true });
+    else out.push({ cls: 'ok', txt: `${nome} até ${dataPT(c[campo])}` });
+  });
+  if (c.revisaoKm) {
+    const km = kmAtual(c.id);
+    if (km == null) out.push({ cls: 'neutro', txt: `Revisão aos ${num(c.revisaoKm)} km` });
+    else {
+      const falta = c.revisaoKm - km;
+      if (falta <= 0) out.push({ cls: 'mau', txt: `Revisão em atraso (${num(-falta)} km)`, alerta: true });
+      else if (falta <= 1500) out.push({ cls: 'medio', txt: `Revisão daqui a ${num(falta)} km`, alerta: true });
+      else out.push({ cls: 'ok', txt: `Revisão daqui a ${num(falta)} km` });
+    }
+  }
+  return out;
+}
+
+function desenharAvisos() {
+  const avisos = [];
+  dados.carrinhas.forEach((c) => estadoDocs(c).filter((d) => d.alerta)
+    .forEach((d) => avisos.push({ ...d, matricula: c.matricula })));
+  avisos.sort((a, b) => (a.cls === 'mau' ? -1 : 1) - (b.cls === 'mau' ? -1 : 1));
+  $('#blocoAvisos').hidden = !avisos.length;
+  $('#listaAvisos').innerHTML = avisos.map((a) => `<div class="aviso-item ${a.cls}">${a.cls === 'mau' ? '⛔' : '⚠️'}
+    <div><b>${esc(a.txt)}</b><small>${esc(a.matricula)}</small></div></div>`).join('');
+}
+
 function desenharPainel() {
+  desenharAvisos();
   const t = resumoPeriodo();
   $('#totReceita').textContent = euro(t.receita);
   $('#totGastos').textContent = euro(t.gastos);
@@ -401,10 +443,13 @@ function desenharListas() {
 
   // Carrinhas
   $('#listaCarrinhas').innerHTML = dados.carrinhas.length ? dados.carrinhas.map((c) => {
-    const kms = dados.abastecimentos.filter((a) => a.carrinhaId === c.id).map((a) => a.km);
-    return `<div class="item"><div class="info"><div class="titulo">${esc(c.matricula)}</div>
-      <div class="sub">${esc(c.modelo || 'Sem modelo')}${kms.length ? ' · ' + num(Math.max(...kms)) + ' km' : ''}</div></div>
-      <div class="direita">${btnApagar('carrinhas', c.id)}</div></div>`;
+    const km = kmAtual(c.id);
+    const docs = estadoDocs(c).map((d) => `<span class="badge ${d.cls}">${d.txt}</span>`).join('');
+    return `<div class="item van"><div class="linha">
+        <span class="placa"><i>P</i><span>${esc(c.matricula)}</span></span>
+        <div>${btnEditar('carrinhas', c.id)}${btnApagar('carrinhas', c.id)}</div></div>
+      <div class="modelo">${esc(c.modelo || 'Modelo por indicar')}${km != null ? ' · ' + num(km) + ' km' : ''}</div>
+      <div class="docs">${docs || '<span class="badge neutro">Sem datas registadas</span>'}</div></div>`;
   }).join('') : vazioMsg('Ainda não adicionou carrinhas.');
 }
 
@@ -545,14 +590,12 @@ ligarFormulario('#formDespesas', 'despesas', (f) => ({
   carrinhaId: f.carrinhaId || '', data: f.data, categoria: f.categoria, valor: N(f.valor), descricao: f.descricao.trim(),
 }), '💸 Despesa guardada');
 
-$('#formCarrinhas').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target));
+ligarFormulario('#formCarrinhas', 'carrinhas', (f, editId) => {
   const matricula = f.matricula.trim().toUpperCase();
-  if (dados.carrinhas.some((c) => c.matricula === matricula)) { aviso('Essa matrícula já existe.'); return; }
-  dados.carrinhas.push({ id: novoId(), matricula, modelo: f.modelo.trim() });
-  guardar(); e.target.reset(); desenhar(); aviso('🚐 Carrinha adicionada');
-});
+  if (dados.carrinhas.some((c) => c.matricula === matricula && c.id !== editId)) { aviso('Essa matrícula já existe.'); return null; }
+  return { matricula, modelo: f.modelo.trim(), seguro: f.seguro, inspecao: f.inspecao, iuc: f.iuc,
+    revisaoKm: f.revisaoKm === '' ? null : N(f.revisaoKm) };
+}, '🚐 Carrinha guardada');
 
 /* Pré-visualização da viagem (ver se uma carga compensa) */
 // Receita conforme a forma de cobrar: km carregado × preço/km, ou valor acordado.
@@ -839,6 +882,7 @@ const Nuvem = {
     $('#nuvemSemConfig').hidden = cfg;
     $('#nuvemEntrar').hidden = !cfg || !!this.user;
     $('#nuvemLigado').hidden = !this.user;
+    $('#dicasLocal').hidden = !!this.user;
     const ind = $('#estadoNuvem');
     ind.hidden = !cfg;
     if (!cfg) return;
