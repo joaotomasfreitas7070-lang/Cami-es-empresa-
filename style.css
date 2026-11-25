@@ -356,3 +356,12 @@ button.mini.mau { color: var(--vermelho); border-color: var(--vermelho); }
 .caixa hr { border: 0; border-top: 1px solid var(--borda); margin: 14px 0; }
 #formCriarEmpresa { padding: 0; }
 #formCriarEmpresa label { display: block; margin: 12px 0 0; font-size: .85rem; font-weight: 600; color: var(--suave); }
+
+.aviso-item[data-ir] { cursor: pointer; }
+.meus-dados { margin-top: 14px; padding: 0 16px; }
+.meus-dados summary { padding: 14px 0; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.meus-dados[open] { padding-bottom: 16px; }
+.meus-dados form { padding: 0; }
+.meus-dados label { display: block; margin: 12px 0 0; font-size: .85rem; font-weight: 600; color: var(--suave); }
+a.botao-link { display: inline-block; text-decoration: none; color: var(--texto); border: 1px solid var(--borda); background: var(--cartao);
+  padding: 7px 11px; border-radius: 9px; font-size: .84rem; font-weight: 600; }

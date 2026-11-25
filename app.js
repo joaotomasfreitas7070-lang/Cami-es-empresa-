@@ -295,7 +295,7 @@ function desenharAvisos() {
   const peso = { mau: 0, medio: 1, ok: 2 };
   avisos.sort((a, b) => (peso[a.cls] ?? 1) - (peso[b.cls] ?? 1));
   $('#blocoAvisos').hidden = !avisos.length;
-  $('#listaAvisos').innerHTML = avisos.map((a) => `<div class="aviso-item ${a.cls}">${a.icone || (a.cls === 'mau' ? '⛔' : '⚠️')}
+  $('#listaAvisos').innerHTML = avisos.map((a) => `<div class="aviso-item ${a.cls}"${a.ir ? ` data-ir="${a.ir}" data-foco="${a.foco || ''}" role="button"` : ''}>${a.icone || (a.cls === 'mau' ? '⛔' : '⚠️')}
     <div><b>${esc(a.txt)}</b><small>${esc(a.sub ?? a.matricula)}</small></div></div>`).join('');
 }
 

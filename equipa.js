@@ -24,6 +24,8 @@ const PERMISSOES = [
   ['ocorrencias_gerir', 'Tratar os problemas das carrinhas'],
   ['ferias_aprovar', 'Aprovar férias e folgas'],
   ['pessoas_gerir', 'Adicionar, alterar e remover pessoas'],
+  ['avisos_aniversarios', 'Ser avisado dos aniversários (1 dia antes e no dia)'],
+  ['avisos_ferias', 'Ser avisado das férias da equipa (1 semana antes)'],
 ];
 const TIPOS_SYNC = ['carrinhas', 'viagens', 'abastecimentos', 'despesas', 'custosFixos', 'ferias', 'ocorrencias'];
 const URGENCIA = { baixa: ['ok', '🟢 Pode trabalhar'], media: ['medio', '🟠 Ver em breve'], alta: ['mau', '🔴 Parada'] };
@@ -74,6 +76,32 @@ function diasUteis(ini, fim) {
   return n;
 }
 const sobrepoe = (a, b) => a.inicio <= b.fim && b.inicio <= a.fim;
+
+// Telemóvel: aceita "912 345 678", "+351 912345678", números estrangeiros…
+const soDigitos = (t) => String(t || '').replace(/[\s().-]/g, '');
+const telValido = (t) => /^\+?\d{9,15}$/.test(soDigitos(t));
+const telWhatsApp = (t) => { const d = soDigitos(t).replace(/^\+/, ''); return d.length === 9 ? '351' + d : d; };
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const diaMes = (iso) => (iso ? `${Number(String(iso).slice(8, 10))} ${MESES_CURTOS[Number(String(iso).slice(5, 7)) - 1]}` : '');
+// Quantos dias faltam para o próximo aniversário de uma data (0 = hoje) e quantos anos faz.
+function proximoAniversario(iso) {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const hoje = new Date(hojeISO() + 'T00:00:00');
+  const naData = (ano) => {
+    const bissexto = (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0;
+    return new Date(ano, m - 1, m === 2 && d === 29 && !bissexto ? 28 : d);
+  };
+  let ano = hoje.getFullYear(), prox = naData(ano);
+  if (prox < hoje) prox = naData(++ano);
+  return { dias: Math.round((prox - hoje) / 864e5), anos: ano - y };
+}
+function idade(iso) {
+  if (!iso) return null;
+  const p = proximoAniversario(iso);
+  return p.dias === 0 ? p.anos : p.anos - 1;
+}
 
 /* ---------- Módulo ---------- */
 const Equipa = {
@@ -389,9 +417,13 @@ const Equipa = {
 
   /* ----- Pessoas ----- */
   async guardarPessoa(f, editId) {
+    if (!telValido(f.telefone)) { aviso('❌ O telemóvel não parece certo (ex: 912 345 678).'); return false; }
+    const anos = idade(f.data_nascimento);
+    if (anos == null || anos < 14 || anos > 100) { aviso('❌ Verifique a data de nascimento.'); return false; }
     const registo = {
-      nome: f.nome.trim(), email: f.email.trim().toLowerCase(), telefone: f.telefone.trim() || null, papel: f.papel,
+      nome: f.nome.trim(), email: f.email.trim().toLowerCase(), telefone: f.telefone.trim(), papel: f.papel,
       dias_ferias: Math.max(0, Math.min(60, Math.round(N(f.dias_ferias || 22)))), data_entrada: f.data_entrada || null,
+      data_nascimento: f.data_nascimento, contacto_emergencia: (f.contacto_emergencia || '').trim() || null,
     };
     const q = editId
       ? this.cli().from('membros').update(registo).eq('id', editId)
@@ -400,7 +432,9 @@ const Equipa = {
     if (error) {
       aviso(erroDeRede(error) ? '❌ Precisa de internet para alterar pessoas.'
         : /duplicate|unique/i.test(error.message) ? '❌ Já existe uma pessoa com esse email.'
-          : /row-level|policy/i.test(error.message) ? '⛔ Sem permissão para isso.' : '❌ ' + error.message);
+          : /row-level|policy/i.test(error.message) ? '⛔ Sem permissão para isso.'
+            : /data_nascimento|contacto_emergencia|column/i.test(error.message) ? '❌ Falta correr o ficheiro equipa-2.sql no Supabase.'
+              : '❌ ' + error.message);
       return false;
     }
     await this.carregarEquipa();
@@ -408,6 +442,25 @@ const Equipa = {
     aviso(editId ? '✅ Pessoa atualizada' : `✅ ${registo.nome} adicionado. Envie-lhe o convite (📤).`);
     return true;
   },
+  perfilCompleto(m = this.eu) { return !!(m?.telefone && m?.data_nascimento); },
+  async guardarMeuPerfil(f) {
+    if (!telValido(f.telefone)) { aviso('❌ O telemóvel não parece certo (ex: 912 345 678).'); return; }
+    const anos = idade(f.data_nascimento);
+    if (anos == null || anos < 14 || anos > 100) { aviso('❌ Verifique a data de nascimento.'); return; }
+    const { error } = await this.cli().rpc('atualizar_meu_perfil', {
+      p_telefone: f.telefone.trim(), p_nascimento: f.data_nascimento, p_emergencia: (f.contacto_emergencia || '').trim(),
+    });
+    if (error) {
+      aviso(erroDeRede(error) ? '❌ Precisa de internet para guardar.' : /function|schema/i.test(error.message)
+        ? '❌ Falta correr o ficheiro equipa-2.sql no Supabase.' : '❌ ' + error.message);
+      return;
+    }
+    await this.carregarEquipa();
+    $('#detMeuPerfil').open = false;
+    this.desenhar(); desenharAvisos();
+    aviso('✅ Dados guardados. Obrigado!');
+  },
+
   async removerPessoa(id) {
     const m = this.membros.find((x) => x.id === id);
     if (!m) return;
@@ -504,6 +557,47 @@ const Equipa = {
         sub: `${dados.carrinhas.find((c) => c.id === o.carrinhaId)?.matricula || ''} · ${this.nomeDe(o._por)} · ${o.estado}`,
       }));
     }
+    // 👤 Dados em falta (a própria pessoa e o RH)
+    if (this.eu && !this.perfilCompleto()) {
+      out.push({ cls: 'medio', icone: '👤', txt: 'Complete os seus dados: telemóvel e data de nascimento', sub: 'Toque aqui → Equipa → Os meus dados', ir: 'equipa', foco: 'detMeuPerfil' });
+    }
+    if (this.pode('pessoas_gerir')) {
+      const faltam = this.membros.filter((m) => m.user_id !== this.user.id && !this.perfilCompleto(m));
+      if (faltam.length) {
+        out.push({ cls: 'medio', icone: '📋', txt: `Faltam dados de ${faltam.length} pessoa${faltam.length > 1 ? 's' : ''}: ${faltam.map((m) => m.nome.split(' ')[0]).join(', ')}`,
+          sub: 'Telemóvel e data de nascimento', ir: 'equipa', foco: 'listaPessoas' });
+      }
+    }
+    // 🎂 Aniversários (1 dia antes e no próprio dia) e anos de casa
+    if (this.pode('avisos_aniversarios')) {
+      this.membros.filter((m) => m.user_id !== this.user.id).forEach((m) => {
+        const tel = m.telefone ? ` · 📞 ${m.telefone}` : '';
+        const p = proximoAniversario(m.data_nascimento);
+        if (p && p.dias <= 1) {
+          out.push({ cls: p.dias === 0 ? 'ok' : 'medio', icone: '🎂', sub: `Faz ${p.anos} anos${tel}`,
+            txt: p.dias === 0 ? `Hoje é o aniversário de ${m.nome}!` : `Amanhã é o aniversário de ${m.nome}` });
+        }
+        const c = proximoAniversario(m.data_entrada);
+        if (c && c.dias <= 1 && c.anos >= 1) {
+          out.push({ cls: 'ok', icone: '🎉', sub: `Entrou em ${dataPT(m.data_entrada)}`,
+            txt: `${c.dias === 0 ? 'Hoje' : 'Amanhã'} ${m.nome} faz ${c.anos} ano${c.anos > 1 ? 's' : ''} na empresa` });
+        }
+      });
+    }
+    // 🏖️ Férias da equipa que começam na próxima semana
+    if (this.pode('avisos_ferias')) {
+      const hoje = hojeISO();
+      const daquiASemana = new Date(new Date(hoje + 'T00:00:00').getTime() + 7 * 864e5);
+      const limite = `${daquiASemana.getFullYear()}-${String(daquiASemana.getMonth() + 1).padStart(2, '0')}-${String(daquiASemana.getDate()).padStart(2, '0')}`;
+      dados.ferias.filter((f) => f.estado === 'Aprovado' && !this.meu(f) && f.inicio >= hoje && f.inicio <= limite)
+        .sort((a, b) => a.inicio.localeCompare(b.inicio))
+        .forEach((f) => {
+          const n = Math.round((new Date(f.inicio + 'T00:00:00') - new Date(hoje + 'T00:00:00')) / 864e5);
+          out.push({ cls: 'medio', icone: '🏖️', ir: 'equipa', foco: 'listaAusencias',
+            txt: `${this.nomeDe(f._por)}: ${f.tipo.toLowerCase()} ${n === 0 ? 'a partir de hoje' : n === 1 ? 'a partir de amanhã' : `daqui a ${n} dias`}`,
+            sub: `${dataPT(f.inicio)} → ${dataPT(f.fim)} · ${f.dias} dia${f.dias === 1 ? '' : 's'} úte${f.dias === 1 ? 'il' : 'is'}` });
+        });
+    }
     const semana = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
     dados.ferias.filter((f) => this.meu(f) && ['Aprovado', 'Recusado'].includes(f.estado) && (f.decididoEm || '') >= semana)
       .forEach((f) => out.push({
@@ -537,6 +631,15 @@ const Equipa = {
     saud.innerHTML = `<span class="avatar">${esc(iniciais(this.eu?.nome))}</span><div><b>Olá, ${esc((this.eu?.nome || '').split(' ')[0])} 👋</b>
       <small>${esc(PAPEIS[this.eu?.papel] || '')} · ${esc(this.empresa.nome || '')}</small></div>`;
     $('#perfil').innerHTML = saud.innerHTML;
+    const completo = this.perfilCompleto();
+    $('#perfilEstado').innerHTML = completo ? '<span class="badge ok">✓ completo</span>' : '<span class="badge medio">por completar</span>';
+    const fp = $('#formMeuPerfil');
+    if (!fp.contains(document.activeElement)) {
+      fp.elements.telefone.value = this.eu?.telefone || '';
+      fp.elements.data_nascimento.value = this.eu?.data_nascimento || '';
+      fp.elements.contacto_emergencia.value = this.eu?.contacto_emergencia || '';
+    }
+    if (!completo && !this._perfilAberto) { $('#detMeuPerfil').open = true; this._perfilAberto = true; }
 
     this.desenharPainelPessoal();
     this.desenharOcorrencias();
@@ -556,9 +659,16 @@ const Equipa = {
     const km = vs.reduce((s, v) => s + N(v.kmCarregado) + N(v.kmVazio), 0);
     const sf = this.saldoFerias();
     const problemas = dados.ocorrencias.filter((o) => o.estado !== 'Resolvido' && (this.gereProblemas() || this.meu(o))).length;
-    $('#cartoesPessoais').innerHTML = `
+    const fazViagens = this.pode('viagens_registar') || this.pode('viagens_ver_todas');
+    const hoje = hojeISO();
+    const ausentes = dados.ferias.filter((f) => f.estado === 'Aprovado' && f.inicio <= hoje && f.fim >= hoje).length;
+    const porAprovar = dados.ferias.filter((f) => f.estado === 'Pendente').length;
+    $('#cartoesPessoais').innerHTML = (fazViagens ? `
       <div class="cartao"><small>${this.pode('viagens_ver_todas') ? 'Viagens' : 'As minhas viagens'}</small><strong>${vs.length}</strong></div>
-      <div class="cartao"><small>Km no período</small><strong>${num(km)}</strong></div>
+      <div class="cartao"><small>Km no período</small><strong>${num(km)}</strong></div>` : `
+      <div class="cartao"><small>Na equipa</small><strong>${this.membros.length} pessoas</strong></div>
+      ${this.pode('ferias_aprovar') ? `<div class="cartao ${porAprovar ? 'vermelho' : ''}"><small>Férias por aprovar</small><strong>${porAprovar}</strong></div>`
+        : `<div class="cartao"><small>Ausentes hoje</small><strong>${ausentes}</strong></div>`}`) + `
       <div class="cartao destaque"><small>Férias restam</small><strong class="positivo">${sf.restam} dias</strong></div>
       ${problemas ? `<div class="cartao vermelho"><small>Problemas abertos</small><strong>${problemas}</strong></div>` : ''}`;
   },
@@ -646,8 +756,13 @@ const Equipa = {
           <div class="titulo">${esc(m.nome)}${m.user_id === this.user.id ? ' <small>(eu)</small>' : ''}</div>
           <div class="sub"><span class="badge papel-${m.papel}">${esc(PAPEIS[m.papel])}</span>
             ${m.user_id ? '' : '<span class="badge medio">Convite por aceitar</span>'}</div>
-          <div class="sub">${m.telefone ? `<a href="tel:${esc(m.telefone.replace(/\s/g, ''))}">📞 ${esc(m.telefone)}</a> · ` : ''}${esc(m.email)}</div>
+          <div class="sub">${esc(m.email)}${m.data_nascimento ? ` · 🎂 ${diaMes(m.data_nascimento)}${gere ? ` (${idade(m.data_nascimento)} anos)` : ''}` : ''}</div>
+          ${gere && m.contacto_emergencia ? `<div class="sub">🆘 Emergência: ${esc(m.contacto_emergencia)}</div>` : ''}
           ${gere && m.user_id ? `<div class="sub">🏖️ ${sf.restam} de ${m.dias_ferias} dias de férias por gozar</div>` : ''}
+          ${gere && !this.perfilCompleto(m) ? `<div class="sub"><span class="badge medio">⚠️ Falta: ${[!m.telefone && 'telemóvel', !m.data_nascimento && 'data de nascimento'].filter(Boolean).join(' e ')}</span></div>` : ''}
+          ${m.telefone && m.user_id !== this.user.id ? `<div class="botoes mini-botoes">
+            <a class="mini botao-link" href="tel:${esc(soDigitos(m.telefone))}">📞 Ligar</a>
+            <a class="mini botao-link" href="https://wa.me/${esc(telWhatsApp(m.telefone))}" target="_blank" rel="noopener">💬 WhatsApp</a></div>` : ''}
         </div>
         <div class="direita">${podeMexer ? `${m.user_id ? '' : `<button class="icone" data-convite="${m.id}" aria-label="Enviar convite">📤</button>`}
           <button class="icone" data-pessoa-editar="${m.id}" aria-label="Editar">✏️</button>
@@ -735,13 +850,18 @@ $('#listaPermissoes').addEventListener('change', (e) => {
   if (c) Equipa.mudarPermissao($('#selPapelPermissoes').value, c.dataset.permChave, c.checked);
 });
 
+$('#formMeuPerfil').addEventListener('submit', (e) => {
+  e.preventDefault();
+  Equipa.guardarMeuPerfil(Object.fromEntries(new FormData(e.target)));
+});
+
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('button, a');
+  const t = e.target.closest('button, a, .aviso-item[data-ir]');
   if (!t) return;
   const d = t.dataset;
   if (d.ir) {
     $(`#abas button[data-aba="${d.ir}"]`).click();
-    if (d.foco) setTimeout(() => $('#' + d.foco)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    if (d.foco) setTimeout(() => { const el = $('#' + d.foco); if (!el) return; if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
   } else if (d.oc) Equipa.mudarOcorrencia(d.oc, d.estado);
   else if (d.ferDecidir) Equipa.decidirFerias(d.ferDecidir, d.aprovar === '1');
   else if (d.ferCancelar) {
@@ -753,7 +873,7 @@ document.addEventListener('click', (e) => {
     const m = Equipa.membros.find((x) => x.id === d.pessoaEditar);
     const form = $('#formPessoas');
     if (!m) return;
-    ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
+    ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada', 'data_nascimento', 'contacto_emergencia'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
     form.dataset.editId = m.id;
     form.querySelector('.tituloForm').textContent = '✏️ A editar ' + m.nome;
     form.querySelector('.cancelar').hidden = false;

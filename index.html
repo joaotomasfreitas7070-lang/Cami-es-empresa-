@@ -238,6 +238,19 @@
       <div id="equipaAtiva" hidden>
         <div class="perfil" id="perfil"></div>
 
+        <details class="caixa meus-dados" id="detMeuPerfil">
+          <summary>👤 Os meus dados <span id="perfilEstado"></span></summary>
+          <form id="formMeuPerfil">
+            <p class="ajuda">Para a empresa o poder contactar e não se esquecer do seu aniversário 🎂.</p>
+            <div class="grid2">
+              <label>Telemóvel *<input type="tel" name="telefone" inputmode="tel" required placeholder="912 345 678"></label>
+              <label>Data de nascimento *<input type="date" name="data_nascimento" required></label>
+            </div>
+            <label>Contacto de emergência<input type="text" name="contacto_emergencia" placeholder="ex: Maria (mãe) 913 000 000"></label>
+            <button type="submit" class="principal">Guardar os meus dados</button>
+          </form>
+        </details>
+
         <h2>⚠️ Reportar problema na carrinha</h2>
         <form id="formOcorrencias" class="formulario">
           <h3 class="tituloForm" data-novo="O que se passa?">O que se passa?</h3>
@@ -313,10 +326,15 @@
           </div>
           <label>Email (é com este email que a pessoa cria a conta)<input type="email" name="email" required autocapitalize="off"></label>
           <div class="grid2">
-            <label>Telemóvel<input type="tel" name="telefone" inputmode="tel"></label>
-            <label>Dias de férias / ano<input type="number" name="dias_ferias" min="0" max="60" value="22" inputmode="numeric"></label>
+            <label>Telemóvel *<input type="tel" name="telefone" inputmode="tel" required placeholder="912 345 678" autocomplete="off"></label>
+            <label>Data de nascimento *<input type="date" name="data_nascimento" required></label>
           </div>
-          <label>Data de entrada<input type="date" name="data_entrada"></label>
+          <div class="grid2">
+            <label>Dias de férias / ano<input type="number" name="dias_ferias" min="0" max="60" value="22" inputmode="numeric"></label>
+            <label>Data de entrada<input type="date" name="data_entrada"></label>
+          </div>
+          <label>Contacto de emergência (opcional)<input type="text" name="contacto_emergencia" placeholder="ex: Maria (mãe) 913 000 000"></label>
+          <p class="ajuda">* Obrigatório. O RH e o Marketing são avisados do aniversário um dia antes.</p>
           <button type="submit" class="principal">Guardar pessoa</button>
           <button type="button" class="cancelar" hidden>Cancelar edição</button>
         </form>
