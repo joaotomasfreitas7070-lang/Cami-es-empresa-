@@ -491,10 +491,13 @@ function editar(tipo, id) {
   if (!form || !reg) return;
   form.reset();
   [...form.elements].forEach((el) => {
-    if (el.name && reg[el.name] !== undefined) el.value = reg[el.name] === 0 && el.type === 'number' && !el.required ? '' : reg[el.name];
+    if (!el.name || reg[el.name] === undefined || el.type === 'radio') return;
+    el.value = reg[el.name] === 0 && el.type === 'number' && !el.required ? '' : reg[el.name] ?? '';
   });
-  if (tipo === 'viagens' && form.elements.precoKm.value === '' && N(reg.kmCarregado) > 0) {
-    form.elements.precoKm.value = Math.round((N(reg.receita) / N(reg.kmCarregado)) * 1000) / 1000;
+  if (tipo === 'viagens') {
+    const tp = reg.tipoPreco || (reg.precoKm != null ? 'km' : 'fechado');
+    form.querySelector(`[name=tipoPreco][value=${tp}]`).checked = true;
+    form.elements.receita.value = reg.receita || '';
   }
   form.dataset.editId = id;
   form.querySelector('.tituloForm').textContent = '✏️ A editar';
@@ -503,12 +506,19 @@ function editar(tipo, id) {
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-ligarFormulario('#formViagens', 'viagens', (f) => ({
-  data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
-  kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita: N(f.receita), precoKm: f.precoKm === '' ? null : N(f.precoKm),
+ligarFormulario('#formViagens', 'viagens', (f) => {
+  const receita = receitaDoForm(f);
+  if (receita <= 0) {
+    aviso(f.tipoPreco === 'fechado' ? 'Escreva o valor acordado.' : 'Escreva os km carregados e o preço por km.');
+    return null;
+  }
+  return {
+  tipoPreco: f.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
+  kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita, precoKm: f.tipoPreco === 'km' ? N(f.precoKm) : null,
   portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros),
   fatura: f.fatura.trim(), estado: f.estado, notas: f.notas.trim(),
-}), '🚚 Viagem guardada');
+  };
+}, '🚚 Viagem guardada');
 
 ligarFormulario('#formAbastecer', 'abastecimentos', (f, editId) => {
   if (!f.carrinhaId) { aviso('Adicione primeiro uma carrinha em ⚙️ Mais.'); return null; }
@@ -534,9 +544,34 @@ $('#formCarrinhas').addEventListener('submit', (e) => {
 });
 
 /* Pré-visualização da viagem (ver se uma carga compensa) */
-function atualizarPreview() {
+// Receita conforme a forma de cobrar: km carregado × preço/km, ou valor acordado.
+function receitaDoForm(f) {
+  if (f.tipoPreco === 'fechado') return N(f.receita);
+  return Math.round(N(f.kmCarregado) * N(f.precoKm) * 100) / 100;
+}
+
+function mostrarTipoPreco() {
   const form = $('#formViagens');
   const f = Object.fromEntries(new FormData(form));
+  const fechado = f.tipoPreco === 'fechado';
+  $('#campoPrecoKm').hidden = fechado;
+  $('#campoReceita').hidden = !fechado;
+  const kc = N(f.kmCarregado);
+  const receita = receitaDoForm(f);
+  let txt = '';
+  if (!fechado && N(f.precoKm) > 0) {
+    txt = kc > 0 ? `Receita: ${num(kc)} km × ${euro(N(f.precoKm))} = <b>${euro(receita)}</b>` : 'Escreva os km carregados para calcular a receita.';
+  } else if (fechado && receita > 0) {
+    txt = `Receita: <b>${euro(receita)}</b>${kc > 0 ? ` · equivale a <b>${euro(receita / kc)}</b> por km carregado` : ''}`;
+  }
+  $('#infoReceita').innerHTML = txt;
+}
+
+function atualizarPreview() {
+  mostrarTipoPreco();
+  const form = $('#formViagens');
+  const f = Object.fromEntries(new FormData(form));
+  f.receita = receitaDoForm(f);
   const el = $('#previewViagem');
   if (!N(f.receita) && !N(f.kmCarregado)) { el.innerHTML = ''; return; }
   const c = calcViagem(f);
@@ -548,16 +583,7 @@ function atualizarPreview() {
       ${c.aval ? ` <span class="badge ${c.aval.cls}">${c.aval.txt}</span>` : ''}`,
   ].filter(Boolean).join('<br>');
 }
-$('#formViagens').addEventListener('input', (e) => {
-  const el = $('#formViagens').elements;
-  const kc = N(el.kmCarregado.value);
-  if ((e.target.name === 'precoKm' || e.target.name === 'kmCarregado') && el.precoKm.value !== '' && kc > 0) {
-    el.receita.value = (Math.round(kc * N(el.precoKm.value) * 100) / 100).toFixed(2);
-  } else if (e.target.name === 'receita') {
-    el.precoKm.value = kc > 0 && el.receita.value !== '' ? Math.round((N(el.receita.value) / kc) * 1000) / 1000 : '';
-  }
-  atualizarPreview();
-});
+$('#formViagens').addEventListener('input', atualizarPreview);
 
 /* Custos fixos */
 $('#listaFixos').addEventListener('change', (e) => {

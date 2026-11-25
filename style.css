@@ -224,3 +224,13 @@ button.badge { border: 0; cursor: pointer; padding: 4px 10px; }
 .tabela tr.atual td { background: color-mix(in srgb, var(--azul) 12%, transparent); font-weight: 600; }
 .mes { flex-wrap: nowrap; gap: 6px; }
 .mes input { flex: 1 1 auto; min-width: 0; }
+
+.seletor { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; padding: 4px;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: 12px; }
+.formulario .seletor label { margin: 0; }
+.seletor input { position: absolute; opacity: 0; pointer-events: none; }
+.seletor span { display: block; text-align: center; padding: 10px 6px; border-radius: 9px; color: var(--suave); font-weight: 600; cursor: pointer; }
+.seletor input:checked + span { background: var(--azul); color: #fff; }
+.seletor input:focus-visible + span { outline: 2px solid var(--azul); outline-offset: 2px; }
+.info-receita { margin: 8px 0 0; font-size: .95rem; }
+.info-receita:empty { display: none; }

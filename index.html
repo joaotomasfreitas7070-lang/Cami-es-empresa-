@@ -86,11 +86,13 @@
           <label>Km carregado<input type="number" name="kmCarregado" min="0" step="1" inputmode="numeric"></label>
           <label>Km em vazio<input type="number" name="kmVazio" min="0" step="1" inputmode="numeric"></label>
         </div>
-        <div class="grid2">
-          <label>Preço por km (€)<input type="number" name="precoKm" min="0" step="0.001" inputmode="decimal" placeholder="ex: 0,80"></label>
-          <label>Receita (€)<input type="number" name="receita" min="0" step="0.01" inputmode="decimal" required></label>
+        <div class="seletor" role="radiogroup" aria-label="Como cobra a viagem">
+          <label><input type="radio" name="tipoPreco" value="km" checked><span>Preço por km</span></label>
+          <label><input type="radio" name="tipoPreco" value="fechado"><span>Valor acordado</span></label>
         </div>
-        <p class="ajuda">Escreva o preço por km e a receita calcula-se sozinha (km carregado × preço). Se for um preço fechado, escreva só a receita.</p>
+        <label id="campoPrecoKm">Preço por km carregado (€)<input type="number" name="precoKm" min="0" step="0.001" inputmode="decimal" placeholder="ex: 0,80"></label>
+        <label id="campoReceita" hidden>Valor acordado da viagem (€)<input type="number" name="receita" min="0" step="0.01" inputmode="decimal" placeholder="ex: 350"></label>
+        <p class="info-receita" id="infoReceita"></p>
         <div class="grid3">
           <label>Portagens (€)<input type="number" name="portagens" min="0" step="0.01" inputmode="decimal"></label>
           <label>Comida (€)<input type="number" name="alimentacao" min="0" step="0.01" inputmode="decimal"></label>
