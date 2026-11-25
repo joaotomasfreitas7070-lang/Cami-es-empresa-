@@ -117,7 +117,7 @@ function gasoleoPorKm(carrinhaId) {
     const km = lista.reduce((s, a) => s + a.dist, 0);
     return km > 0 ? lista.reduce((s, a) => s + a.valor, 0) / km : null;
   };
-  return (carrinhaId && calc(abast.filter((a) => a.carrinhaId === carrinhaId)))
+  return (carrinhaId ? calc(abast.filter((a) => a.carrinhaId === carrinhaId)) : null)
     ?? calc(abast)
     ?? (N(P().consumo) / 100) * N(P().precoGasoleo);
 }
@@ -314,6 +314,23 @@ function desenharPainel() {
         <div class="barra-fundo"><div class="barra" style="width:${(v / max) * 100}%"></div></div><b>${euro(v)}</b></div>`).join('')
     : '<div class="vazio">Sem gastos neste período.</div>';
 
+  // Todos os meses (histórico)
+  const todos = new Set();
+  [...dados.viagens, ...dados.abastecimentos, ...dados.despesas].forEach((x) => x.data && todos.add(x.data.slice(0, 7)));
+  const guardaMes = mes;
+  let hm = '<tr><th>Mês</th><th>Viagens</th><th>Receita</th><th>Lucro*</th><th>Sobra**</th></tr>';
+  [...todos].sort().reverse().forEach((m) => {
+    mes = m;
+    const r = resumoPeriodo();
+    const [a, mm] = m.split('-');
+    hm += `<tr data-mes="${m}" class="${m === guardaMes ? 'atual' : ''}"><td>${MESES[Number(mm) - 1].slice(0, 3)} ${a}</td><td>${r.viagens}</td>
+      <td>${euro(r.receita)}</td><td class="${cls(r.lucro)}">${euro(r.lucro)}</td><td class="${cls(r.sobra)}">${euro(r.sobra)}</td></tr>`;
+  });
+  mes = guardaMes;
+  $('#tabelaMeses').innerHTML = todos.size
+    ? hm + '<caption style="caption-side:bottom;text-align:left;padding:8px;color:var(--suave);font-size:.78rem">* Lucro antes do ordenado. ** Depois do ordenado.</caption>'
+    : '<tr><td>Ainda não há registos.</td></tr>';
+
   // Lembrete de cópia de segurança
   const total = dados.viagens.length + dados.abastecimentos.length + dados.despesas.length;
   const dias = dados.ultimaCopia ? Math.floor((Date.now() - new Date(dados.ultimaCopia)) / 864e5) : null;
@@ -416,6 +433,19 @@ $('#abas').addEventListener('click', (e) => {
 $('#filtroMes').value = mes;
 $('#filtroMes').addEventListener('change', (e) => { mes = e.target.value; desenhar(); });
 $('#btnTodos').addEventListener('click', () => { mes = ''; $('#filtroMes').value = ''; desenhar(); });
+function irParaMes(m) { mes = m; $('#filtroMes').value = m; desenhar(); }
+function mudarMes(delta) {
+  const base = mes || hojeISO().slice(0, 7);
+  const [a, m] = base.split('-').map(Number);
+  const d = new Date(a, m - 1 + delta, 1);
+  irParaMes(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+}
+$('#mesAnt').addEventListener('click', () => mudarMes(-1));
+$('#mesSeg').addEventListener('click', () => mudarMes(1));
+$('#tabelaMeses').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-mes]');
+  if (tr) { irParaMes(tr.dataset.mes); window.scrollTo(0, 0); }
+});
 
 /* ================= Formulários (novo + editar) ================= */
 const FORMS = {};
@@ -463,6 +493,9 @@ function editar(tipo, id) {
   [...form.elements].forEach((el) => {
     if (el.name && reg[el.name] !== undefined) el.value = reg[el.name] === 0 && el.type === 'number' && !el.required ? '' : reg[el.name];
   });
+  if (tipo === 'viagens' && form.elements.precoKm.value === '' && N(reg.kmCarregado) > 0) {
+    form.elements.precoKm.value = Math.round((N(reg.receita) / N(reg.kmCarregado)) * 1000) / 1000;
+  }
   form.dataset.editId = id;
   form.querySelector('.tituloForm').textContent = '✏️ A editar';
   form.querySelector('.cancelar').hidden = false;
@@ -472,7 +505,7 @@ function editar(tipo, id) {
 
 ligarFormulario('#formViagens', 'viagens', (f) => ({
   data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
-  kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita: N(f.receita),
+  kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita: N(f.receita), precoKm: f.precoKm === '' ? null : N(f.precoKm),
   portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros),
   fatura: f.fatura.trim(), estado: f.estado, notas: f.notas.trim(),
 }), '🚚 Viagem guardada');
@@ -515,7 +548,16 @@ function atualizarPreview() {
       ${c.aval ? ` <span class="badge ${c.aval.cls}">${c.aval.txt}</span>` : ''}`,
   ].filter(Boolean).join('<br>');
 }
-$('#formViagens').addEventListener('input', atualizarPreview);
+$('#formViagens').addEventListener('input', (e) => {
+  const el = $('#formViagens').elements;
+  const kc = N(el.kmCarregado.value);
+  if ((e.target.name === 'precoKm' || e.target.name === 'kmCarregado') && el.precoKm.value !== '' && kc > 0) {
+    el.receita.value = (Math.round(kc * N(el.precoKm.value) * 100) / 100).toFixed(2);
+  } else if (e.target.name === 'receita') {
+    el.precoKm.value = kc > 0 && el.receita.value !== '' ? Math.round((N(el.receita.value) / kc) * 1000) / 1000 : '';
+  }
+  atualizarPreview();
+});
 
 /* Custos fixos */
 $('#listaFixos').addEventListener('change', (e) => {

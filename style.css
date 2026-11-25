@@ -218,3 +218,9 @@ button.badge { border: 0; cursor: pointer; padding: 4px 10px; }
   .fixo { grid-template-columns: 1fr 1fr auto; }
   .fixo .fixoNome { grid-column: 1 / -1; }
 }
+
+.seta { padding: 8px 10px; }
+.tabela.clicavel tr[data-mes] { cursor: pointer; }
+.tabela tr.atual td { background: color-mix(in srgb, var(--azul) 12%, transparent); font-weight: 600; }
+.mes { flex-wrap: nowrap; gap: 6px; }
+.mes input { flex: 1 1 auto; min-width: 0; }
