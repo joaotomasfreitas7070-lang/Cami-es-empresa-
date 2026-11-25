@@ -23,6 +23,7 @@ function normalizar(d) {
     custosFixos: d.custosFixos || FIXOS_BASE.map(([nome, valor]) => ({ id: novoId(), nome, valor, periodo: 'Mensal' })),
     parametros: { ...PARAMETROS_BASE, ...(d.parametros || {}) },
     ultimaCopia: d.ultimaCopia || null,
+    alterado: d.alterado || null,
   };
   // Versão anterior: as "receitas" passam a ser viagens.
   (d.receitas || []).forEach((r) => out.viagens.push({
@@ -38,10 +39,20 @@ function carregar() {
 }
 let dados = carregar();
 
-function guardar() {
+// marcar = true quando o utilizador alterou algo (para enviar para a internet).
+function guardar(marcar = true) {
+  if (marcar) { dados.alterado = new Date().toISOString(); Sync.set({ pendente: true }); }
   try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch (e) { aviso('⚠️ Não foi possível guardar neste navegador.'); }
+  if (marcar && typeof Nuvem !== 'undefined') Nuvem.agendar();
 }
-guardar();
+
+// Estado da sincronização (fica fora dos dados).
+const Sync = {
+  CH: 'gestao-frota-sync',
+  get() { try { return JSON.parse(localStorage.getItem(this.CH)) || {}; } catch (e) { return {}; } },
+  set(o) { try { localStorage.setItem(this.CH, JSON.stringify({ ...this.get(), ...o })); } catch (e) { /* */ } },
+};
+guardar(false);
 // Pede ao navegador para não apagar estes dados automaticamente.
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* sem suporte */ }
 
@@ -334,7 +345,7 @@ function desenharPainel() {
   // Lembrete de cópia de segurança
   const total = dados.viagens.length + dados.abastecimentos.length + dados.despesas.length;
   const dias = dados.ultimaCopia ? Math.floor((Date.now() - new Date(dados.ultimaCopia)) / 864e5) : null;
-  const mostrar = total >= 3 && (dias == null || dias >= 7);
+  const mostrar = total >= 3 && (dias == null || dias >= 7) && !Nuvem.user;
   $('#bannerCopia').hidden = !mostrar;
   if (mostrar) $('#bannerTexto').textContent = dias == null ? 'Ainda não guardou nenhuma cópia dos dados.' : `Última cópia há ${dias} dias.`;
   $('#infoUltimaCopia').textContent = dados.ultimaCopia
@@ -698,4 +709,166 @@ $('#btnApagarTudo').addEventListener('click', () => {
   guardar(); desenhar(); aviso('Dados apagados');
 });
 
+/* ================= Internet (Supabase) ================= */
+const Nuvem = {
+  cliente: null, user: null, timer: null, aEnviar: false, estado: '', erro: '',
+
+  configurado() {
+    const c = window.FROTA_NUVEM || {};
+    return !!(c.url && c.chave);
+  },
+
+  async iniciar() {
+    if (!this.configurado()) return this.ui();
+    if (!window.supabase) { this.estado = 'offline'; this.erro = 'Sem ligação à internet.'; return this.ui(); }
+    this.cliente = window.supabase.createClient(window.FROTA_NUVEM.url, window.FROTA_NUVEM.chave);
+    this.cliente.auth.onAuthStateChange((evento, sessao) => {
+      const antes = this.user?.id;
+      this.user = sessao?.user || null;
+      if (evento === 'PASSWORD_RECOVERY') setTimeout(() => this.novaSenha(), 300);
+      if (this.user && this.user.id !== antes) setTimeout(() => this.sincronizar(), 0);
+      this.ui(); desenharPainel();
+    });
+    const { data } = await this.cliente.auth.getSession();
+    this.user = data.session?.user || null;
+    this.ui();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.sincronizar(); });
+    window.addEventListener('online', () => this.sincronizar());
+  },
+
+  agendar() {
+    if (!this.user) return;
+    clearTimeout(this.timer);
+    this.estado = 'pendente'; this.ui();
+    this.timer = setTimeout(() => this.sincronizar(), 1500);
+  },
+
+  async lerRemoto() {
+    const { data, error } = await this.cliente.from('frota_dados').select('dados, atualizado').eq('user_id', this.user.id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async enviar() {
+    const { error } = await this.cliente.from('frota_dados')
+      .upsert({ user_id: this.user.id, dados, atualizado: new Date().toISOString() });
+    if (error) throw error;
+    Sync.set({ base: dados.alterado, pendente: false, ultima: new Date().toISOString() });
+  },
+
+  usarRemoto(remoto) {
+    dados = normalizar(remoto.dados);
+    guardar(false);
+    Sync.set({ base: remoto.dados.alterado || null, pendente: false, ultima: new Date().toISOString() });
+    desenhar();
+  },
+
+  // Compara o que está aqui com o que está na internet e acerta os dois.
+  async sincronizar() {
+    if (!this.user || !this.cliente) return;
+    if (this.aEnviar) { this.agendar(); return; }
+    this.aEnviar = true; this.estado = 'a sincronizar'; this.ui();
+    try {
+      const remoto = await this.lerRemoto();
+      const { base, pendente } = Sync.get();
+      const nLocal = dados.viagens.length + dados.abastecimentos.length + dados.despesas.length + dados.carrinhas.length;
+      if (!remoto) {
+        await this.enviar();
+      } else {
+        const r = remoto.dados || {};
+        const remotoMudou = (r.alterado || null) !== (base || null);
+        const nRemoto = ['viagens', 'abastecimentos', 'despesas', 'carrinhas'].reduce((s, k) => s + ((r[k] || []).length), 0);
+        if (!remotoMudou) {
+          if (pendente) await this.enviar();
+        } else if (!pendente || nLocal === 0) {
+          this.usarRemoto(remoto);
+        } else if (nRemoto === 0) {
+          await this.enviar();
+        } else if (confirm(`Há dados diferentes neste dispositivo e na internet.\n\n` +
+            `Internet: ${(r.viagens || []).length} viagens\nEste dispositivo: ${dados.viagens.length} viagens\n\n` +
+            `OK = ficar com os da INTERNET\nCancelar = ficar com os DESTE dispositivo`)) {
+          this.usarRemoto(remoto);
+        } else {
+          await this.enviar();
+        }
+      }
+      this.estado = 'ok'; this.erro = '';
+    } catch (e) {
+      this.estado = 'erro';
+      this.erro = navigator.onLine === false ? 'Sem internet: os dados ficam guardados aqui e são enviados quando houver ligação.'
+        : 'Não foi possível sincronizar (' + (e.message || e) + ').';
+    } finally {
+      this.aEnviar = false; this.ui();
+    }
+  },
+
+  async entrar(email, senha) {
+    const { error } = await this.cliente.auth.signInWithPassword({ email, password: senha });
+    if (error) aviso(/invalid/i.test(error.message) ? '❌ Email ou palavra-passe errados' : /confirm/i.test(error.message)
+      ? '📧 Confirme primeiro o email (veja a caixa de correio)' : '❌ ' + error.message);
+  },
+
+  async criar(email, senha) {
+    const { data, error } = await this.cliente.auth.signUp({ email, password: senha,
+      options: { emailRedirectTo: location.href.split('#')[0] } });
+    if (error) return aviso('❌ ' + error.message);
+    if (!data.session) alert('Conta criada! Abra o email que recebeu e toque no link de confirmação. Depois volte aqui e toque em Entrar.');
+  },
+
+  async esqueci(email) {
+    if (!email) return aviso('Escreva primeiro o seu email.');
+    const { error } = await this.cliente.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
+    aviso(error ? '❌ ' + error.message : '📧 Enviámos um email para criar uma nova palavra-passe.');
+  },
+
+  async novaSenha() {
+    const nova = prompt('Escreva a nova palavra-passe (mínimo 6 caracteres):');
+    if (!nova) return;
+    const { error } = await this.cliente.auth.updateUser({ password: nova });
+    aviso(error ? '❌ ' + error.message : '✅ Palavra-passe alterada');
+  },
+
+  async sair() {
+    if (!confirm('Sair da conta? Os dados continuam guardados na internet e neste dispositivo.')) return;
+    await this.cliente.auth.signOut();
+    Sync.set({ base: null, pendente: true });
+  },
+
+  ui() {
+    const cfg = this.configurado();
+    $('#nuvemSemConfig').hidden = cfg;
+    $('#nuvemEntrar').hidden = !cfg || !!this.user;
+    $('#nuvemLigado').hidden = !this.user;
+    const ind = $('#estadoNuvem');
+    ind.hidden = !cfg;
+    if (!cfg) return;
+    let icone = '☁️', txt;
+    if (!this.user) { icone = '☁️✕'; txt = 'Não tem sessão iniciada: os dados ficam só neste dispositivo.'; }
+    else if (this.estado === 'erro' || this.estado === 'offline') { icone = '☁️⚠️'; txt = this.erro; }
+    else if (this.estado === 'pendente' || this.estado === 'a sincronizar') { icone = '☁️⏳'; txt = 'A enviar para a internet…'; }
+    else { icone = '☁️✓'; const u = Sync.get().ultima; txt = 'Tudo guardado na internet' + (u ? ' (' + new Date(u).toLocaleString('pt-PT') + ')' : '') + '.'; }
+    ind.textContent = icone; ind.title = txt;
+    if (this.user) { $('#nuvemEmail').textContent = this.user.email; $('#nuvemInfo').textContent = txt; }
+  },
+};
+
+$('#estadoNuvem').addEventListener('click', () => {
+  $('#abas button[data-aba="mais"]').click();
+  aviso($('#estadoNuvem').title);
+});
+$('#nuvemEntrar').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  Nuvem.entrar(f.email.trim(), f.senha);
+});
+$('#nuvemCriar').addEventListener('click', () => {
+  const form = $('#nuvemEntrar');
+  if (!form.reportValidity()) return;
+  Nuvem.criar(form.elements.email.value.trim(), form.elements.senha.value);
+});
+$('#nuvemEsqueci').addEventListener('click', () => Nuvem.esqueci($('#nuvemEntrar').elements.email.value.trim()));
+$('#nuvemSync').addEventListener('click', () => Nuvem.sincronizar());
+$('#nuvemSair').addEventListener('click', () => Nuvem.sair());
+
 desenhar();
+Nuvem.iniciar();

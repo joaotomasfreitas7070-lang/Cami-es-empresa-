@@ -14,5 +14,12 @@ Site simples para gerir a empresa de transportes. Substitui as folhas Excel de c
 - **⚙️ Mais** – cópias de segurança, exportar para Excel, carrinhas, custos fixos e parâmetros (preço objetivo, reserva, ordenado…).
 
 ## Onde ficam os dados
-No navegador do dispositivo (localStorage). Não vão para a internet. Adicione o site ao ecrã principal,
-não apague os dados do Safari e use **Guardar cópia** regularmente.
+Sempre no navegador do dispositivo (funciona sem internet). Com a conta ligada em **⚙️ Mais → Guardar na internet**,
+são também guardados no Supabase e sincronizados entre dispositivos.
+
+### Ligar ao Supabase (uma vez)
+1. Criar projeto em supabase.com.
+2. SQL Editor → colar `supabase/criar-tabela.sql` → Run.
+3. Authentication → URL Configuration → Site URL = endereço do site no GitHub Pages.
+4. Project Settings → API → copiar o *Project URL* e a chave pública (*anon* / *publishable*) para `config.js`.
+   Nunca usar a chave *service_role* / *secret*.

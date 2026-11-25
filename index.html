@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="topo">
-    <h1>🚚 Gestão de Frota</h1>
+    <h1>🚚 Gestão de Frota <button type="button" id="estadoNuvem" class="estado-nuvem" hidden></button></h1>
     <div class="mes">
       <button type="button" id="mesAnt" class="seta" aria-label="Mês anterior">◀</button>
       <input type="month" id="filtroMes" aria-label="Mês">
@@ -176,10 +176,35 @@
 
     <!-- ================= MAIS ================= -->
     <section id="mais" class="aba">
+      <h2>☁️ Guardar na internet</h2>
+      <div class="caixa" id="caixaNuvem">
+        <div id="nuvemSemConfig">
+          <p>Ainda não está ligado a uma base de dados na internet. Os dados ficam só neste dispositivo.</p>
+        </div>
+        <form id="nuvemEntrar" hidden>
+          <p>Entre com a sua conta para guardar tudo na internet e ver os mesmos dados no telemóvel e no computador.</p>
+          <label>Email<input type="email" name="email" autocomplete="username" required></label>
+          <label>Palavra-passe<input type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
+          <button type="submit" class="principal">Entrar</button>
+          <div class="botoes espaco">
+            <button type="button" id="nuvemCriar">Criar conta</button>
+            <button type="button" id="nuvemEsqueci" class="link">Esqueci-me da palavra-passe</button>
+          </div>
+        </form>
+        <div id="nuvemLigado" hidden>
+          <p>✅ Ligado como <b id="nuvemEmail"></b></p>
+          <p class="ajuda" id="nuvemInfo"></p>
+          <div class="botoes espaco">
+            <button type="button" id="nuvemSync">🔄 Sincronizar agora</button>
+            <button type="button" id="nuvemSair">Sair</button>
+          </div>
+        </div>
+      </div>
+
       <h2>💾 Os seus dados</h2>
       <div class="caixa">
-        <p>Tudo o que escreve fica guardado <b>dentro do navegador deste telemóvel</b> (não vai para a internet nem para o GitHub).
-          Por isso:</p>
+        <p>Tudo o que escreve fica sempre guardado <b>neste dispositivo</b> (funciona sem internet).
+          Com a conta da internet ligada (acima), também fica guardado na internet. Sem ela:</p>
         <ul>
           <li>Adicione o site ao ecrã principal (Safari → Partilhar → <i>Adicionar ao ecrã principal</i>) e abra-o sempre por esse ícone.</li>
           <li>Não apague os dados de navegação do Safari.</li>
@@ -246,6 +271,8 @@
   </main>
 
   <div id="aviso" class="aviso" hidden></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
