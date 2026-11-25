@@ -23,3 +23,14 @@ são também guardados no Supabase e sincronizados entre dispositivos.
 3. Authentication → URL Configuration → Site URL = endereço do site no GitHub Pages.
 4. Project Settings → API → copiar o *Project URL* e a chave pública (*anon* / *publishable*) para `config.js`.
    Nunca usar a chave *service_role* / *secret*.
+
+## Equipa (empresa, pessoas e permissões)
+1. Correr `supabase/equipa.sql` no Supabase (SQL Editor → Run), uma vez.
+2. O patrão entra no site → **Equipa** → *Criar empresa*. Os dados que já existiam passam para a empresa.
+3. Em **Equipa → Pessoas**, adicionar cada pessoa com o email e o papel (Patrão, RH, Contabilidade,
+   Logística/Tráfego, Condutor, Mecânico, Marketing) e enviar o convite (📤).
+4. A pessoa cria conta no site com esse email e entra logo na empresa.
+
+Todos podem pedir férias/folgas e reportar problemas nas carrinhas. O que cada papel vê e faz é
+escolhido pelo patrão em **Equipa → O que cada papel pode fazer**; as regras são aplicadas também
+na base de dados (Row Level Security), não só no ecrã.

@@ -93,12 +93,13 @@ main { max-width: 900px; margin: 0 auto; padding: 6px 16px 24px; }
 /* ============ Navegação ============ */
 .abas {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: flex;
   background: var(--preto);
   border-top: 1px solid #22262d;
   padding-bottom: env(safe-area-inset-bottom);
 }
 .abas button {
+  flex: 1 1 0; min-width: 0;
   border: 0; background: none; color: #8b93a0; cursor: pointer; position: relative;
   padding: 9px 2px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 0;
 }
@@ -302,3 +303,56 @@ button.badge { border: 0; cursor: pointer; padding: 4px 10px; }
 
 #caixaNuvem form { padding: 0; }
 #caixaNuvem h3 { margin-top: 14px; }
+
+/* ============ Equipa ============ */
+.num-aba { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--marca); color: #fff; font-size: .68rem; font-weight: 800; line-height: 18px; text-align: center; }
+.saudacao, .perfil { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.saudacao b, .perfil b { display: block; font-size: 1.05rem; }
+.saudacao small, .perfil small { color: var(--suave); font-size: .85rem; }
+.avatar { width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--preto); color: #fff; font-weight: 800; font-size: .9rem; box-shadow: inset 0 -3px 0 var(--marca); }
+@media (prefers-color-scheme: dark) { .avatar { background: #2a3039; } }
+.atalhos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+.atalho { display: flex; align-items: center; gap: 10px; padding: 14px; font-size: 1.3rem; text-align: left;
+  background: var(--cartao); border-radius: var(--raio); box-shadow: var(--sombra); }
+.atalho span { font-size: .92rem; font-weight: 700; }
+.filtros { display: flex; gap: 6px; }
+.chip { padding: 7px 12px; border-radius: 99px; font-size: .85rem; }
+.chip.ativo { background: var(--preto); color: #fff; border-color: var(--preto); }
+@media (prefers-color-scheme: dark) { .chip.ativo { background: #2a3039; border-color: #2a3039; } }
+.mini-botoes { margin-top: 8px; gap: 6px; }
+button.mini { padding: 7px 11px; font-size: .84rem; border-radius: 9px; }
+button.mini.ok { background: var(--verde); border-color: var(--verde); color: #fff; }
+button.mini.mau { color: var(--vermelho); border-color: var(--vermelho); }
+.item.oc { border-left: 4px solid var(--amarelo); align-items: flex-start; }
+.item.oc.urg-alta { border-left-color: var(--vermelho); }
+.item.oc.urg-baixa { border-left-color: var(--verde); }
+.item .sub.texto { color: var(--texto); font-size: .92rem; }
+.placa.mini { display: inline-flex; vertical-align: middle; border: 1.5px solid #1b1b1b; border-radius: 4px; overflow: hidden;
+  font-weight: 800; letter-spacing: .05em; background: #fff; color: #111; font-size: .72rem; margin-left: 4px; }
+.placa.mini i { background: #0a3d91; color: #fff; font-style: normal; font-size: .45rem; padding: 1px 3px; display: flex; align-items: flex-end; }
+.placa.mini span { padding: 1px 5px; }
+.item.pessoa { justify-content: flex-start; align-items: flex-start; }
+.item.pessoa .info { flex: 1; }
+.item.pessoa a { color: inherit; }
+.badge.papel-patrao { background: var(--preto); color: #fff; }
+.badge.papel-rh { background: color-mix(in srgb, #7b4bd6 18%, transparent); color: #7b4bd6; }
+.badge.papel-contabilidade { background: color-mix(in srgb, #0a7ea4 18%, transparent); color: #0a7ea4; }
+.badge.papel-logistica { background: color-mix(in srgb, #d97706 18%, transparent); color: #b45309; }
+.badge.papel-condutor { background: color-mix(in srgb, var(--marca) 14%, transparent); color: var(--marca); }
+.badge.papel-mecanico { background: color-mix(in srgb, #475569 20%, transparent); color: #475569; }
+.badge.papel-marketing { background: color-mix(in srgb, #db2777 16%, transparent); color: #db2777; }
+@media (prefers-color-scheme: dark) {
+  .badge.papel-patrao { background: #eceff3; color: #111; }
+  .badge.papel-mecanico { color: #b8c2cf; } .badge.papel-rh { color: #b494ff; } .badge.papel-contabilidade { color: #5ec8ea; }
+  .badge.papel-logistica { color: #f6ad55; } .badge.papel-marketing { color: #f472b6; }
+}
+.permissoes { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.caixa label.perm { display: flex; align-items: center; gap: 12px; margin: 0; padding: 10px 2px; border-top: 1px solid var(--borda);
+  color: var(--texto); font-weight: 500; cursor: pointer; }
+.perm input { width: 22px; height: 22px; flex: none; margin: 0; accent-color: var(--marca); -webkit-appearance: auto; appearance: auto; }
+.aviso-item.ok { border-left-color: var(--verde); }
+.caixa hr { border: 0; border-top: 1px solid var(--borda); margin: 14px 0; }
+#formCriarEmpresa { padding: 0; }
+#formCriarEmpresa label { display: block; margin: 12px 0 0; font-size: .85rem; font-weight: 600; color: var(--suave); }

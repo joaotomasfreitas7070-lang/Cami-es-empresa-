@@ -15,12 +15,13 @@ const CATEGORIAS_RESERVA = ['Manutenção / revisão', 'Pneus', 'Avaria / repara
 
 const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-function normalizar(d) {
+// semPadroes = true na empresa (os custos fixos vêm da internet, não se inventam).
+function normalizar(d, semPadroes = false) {
   d = d && typeof d === 'object' ? d : {};
   const out = {
     carrinhas: d.carrinhas || [], viagens: d.viagens || [], abastecimentos: d.abastecimentos || [],
-    despesas: d.despesas || [],
-    custosFixos: d.custosFixos || FIXOS_BASE.map(([nome, valor]) => ({ id: novoId(), nome, valor, periodo: 'Mensal' })),
+    despesas: d.despesas || [], ferias: d.ferias || [], ocorrencias: d.ocorrencias || [],
+    custosFixos: d.custosFixos || (semPadroes ? [] : FIXOS_BASE.map(([nome, valor]) => ({ id: novoId(), nome, valor, periodo: 'Mensal' }))),
     parametros: { ...PARAMETROS_BASE, ...(d.parametros || {}) },
     ultimaCopia: d.ultimaCopia || null,
     alterado: d.alterado || null,
@@ -38,12 +39,22 @@ function carregar() {
   try { return normalizar(JSON.parse(localStorage.getItem(CHAVE))); } catch (e) { return normalizar(null); }
 }
 let dados = carregar();
+// Onde os dados ficam guardados neste dispositivo: CHAVE (só este dispositivo / conta pessoal)
+// ou uma chave própria da empresa quando se entra numa empresa.
+let CHAVE_ATUAL = CHAVE;
+const emEquipa = () => typeof Equipa !== 'undefined' && Equipa.ativa();
+// Permissões da pessoa (sem empresa, pode tudo).
+const pode = (p) => (typeof Equipa === 'undefined' ? true : Equipa.pode(p));
+const podeEditar = (tipo, r) => (typeof Equipa === 'undefined' ? true : Equipa.podeEditar(tipo, r));
 
 // marcar = true quando o utilizador alterou algo (para enviar para a internet).
 function guardar(marcar = true) {
-  if (marcar) { dados.alterado = new Date().toISOString(); Sync.set({ pendente: true }); }
-  try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch (e) { aviso('⚠️ Não foi possível guardar neste navegador.'); }
-  if (marcar && typeof Nuvem !== 'undefined') Nuvem.agendar();
+  if (marcar && !emEquipa()) { dados.alterado = new Date().toISOString(); Sync.set({ pendente: true }); }
+  try { localStorage.setItem(CHAVE_ATUAL, JSON.stringify(dados)); } catch (e) { aviso('⚠️ Não foi possível guardar neste navegador.'); }
+  if (marcar) {
+    if (emEquipa()) Equipa.agendar();
+    else if (typeof Nuvem !== 'undefined') Nuvem.agendar();
+  }
 }
 
 // Estado da sincronização (fica fora dos dados).
@@ -276,12 +287,16 @@ function estadoDocs(c) {
 
 function desenharAvisos() {
   const avisos = [];
-  dados.carrinhas.forEach((c) => estadoDocs(c).filter((d) => d.alerta)
-    .forEach((d) => avisos.push({ ...d, matricula: c.matricula })));
-  avisos.sort((a, b) => (a.cls === 'mau' ? -1 : 1) - (b.cls === 'mau' ? -1 : 1));
+  if (pode('carrinhas_gerir') || pode('ocorrencias_gerir')) {
+    dados.carrinhas.forEach((c) => estadoDocs(c).filter((d) => d.alerta)
+      .forEach((d) => avisos.push({ ...d, matricula: c.matricula })));
+  }
+  if (typeof Equipa !== 'undefined') avisos.push(...Equipa.avisos());
+  const peso = { mau: 0, medio: 1, ok: 2 };
+  avisos.sort((a, b) => (peso[a.cls] ?? 1) - (peso[b.cls] ?? 1));
   $('#blocoAvisos').hidden = !avisos.length;
-  $('#listaAvisos').innerHTML = avisos.map((a) => `<div class="aviso-item ${a.cls}">${a.cls === 'mau' ? '⛔' : '⚠️'}
-    <div><b>${esc(a.txt)}</b><small>${esc(a.matricula)}</small></div></div>`).join('');
+  $('#listaAvisos').innerHTML = avisos.map((a) => `<div class="aviso-item ${a.cls}">${a.icone || (a.cls === 'mau' ? '⛔' : '⚠️')}
+    <div><b>${esc(a.txt)}</b><small>${esc(a.sub ?? a.matricula)}</small></div></div>`).join('');
 }
 
 function desenharPainel() {
@@ -410,24 +425,27 @@ const vazioMsg = (m) => `<div class="vazio">${m}</div>`;
 
 function desenharListas() {
   // Viagens
+  const precos = pode('precos');
   const vs = dados.viagens.filter((v) => noPeriodo(v.data)).sort(porDataDesc);
   $('#listaViagens').innerHTML = vs.length ? vs.map((v) => {
     const c = calcViagem(v);
     const rota = v.origem || v.destino ? `${esc(v.origem || '?')} → ${esc(v.destino || '?')}` : esc(v.cliente || 'Viagem');
     const detalhes = [dataPT(v.data), v.cliente && (v.origem || v.destino) ? esc(v.cliente) : '',
       c.kmTotal ? `${num(c.kmTotal)} km${N(v.kmVazio) ? ` (${num(v.kmVazio)} vazio)` : ''}` : '',
-      c.precoKm != null ? `${euro(c.precoKm)}/km` : '', v.fatura ? 'Fat. ' + esc(v.fatura) : '',
-      dados.carrinhas.length > 1 && v.carrinhaId ? esc(nomeCarrinha(v.carrinhaId)) : ''].filter(Boolean).join(' · ');
+      precos && c.precoKm != null ? `${euro(c.precoKm)}/km` : '', precos && v.fatura ? 'Fat. ' + esc(v.fatura) : '',
+      dados.carrinhas.length > 1 && v.carrinhaId ? esc(nomeCarrinha(v.carrinhaId)) : '',
+      typeof Equipa !== 'undefined' ? Equipa.autor(v) : ''].filter(Boolean).join(' · ');
+    const botoes = podeEditar('viagens', v) ? btnEditar('viagens', v.id) + btnApagar('viagens', v.id) : '';
     return `<div class="item"><div class="info">
         <div class="titulo">${rota}</div><div class="sub">${detalhes}</div>
-        <div class="sub">${c.aval ? `<span class="badge ${c.aval.cls}">${c.aval.txt}</span> ` : ''}
-          <button class="badge estado ${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[0]}" data-id="${v.id}">${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[1]}</button>
-          ${v.faturaFicheiro ? `<button class="badge neutro abrirFatura" data-id="${v.id}">📄 Fatura${v.fatura ? ' ' + esc(v.fatura) : ''}</button>` : ''}
+        <div class="sub">${precos && c.aval ? `<span class="badge ${c.aval.cls}">${c.aval.txt}</span> ` : ''}
+          ${precos ? `<button class="badge estado ${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[0]}" data-id="${v.id}">${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[1]}</button>` : ''}
+          ${precos && v.faturaFicheiro ? `<button class="badge neutro abrirFatura" data-id="${v.id}">📄 Fatura${v.fatura ? ' ' + esc(v.fatura) : ''}</button>` : ''}
           ${v.notas ? ' ' + esc(v.notas) : ''}</div>
       </div>
-      <div class="direita"><span class="valor">${euro(v.receita)}</span>
-        <small class="${cls(c.lucro)}">lucro ${euro(c.lucro)}</small>
-        <div>${btnEditar('viagens', v.id)}${btnApagar('viagens', v.id)}</div></div></div>`;
+      <div class="direita">${precos ? `<span class="valor">${euro(v.receita)}</span>
+        <small class="${cls(c.lucro)}">lucro ${euro(c.lucro)}</small>` : `<span class="valor">${num(c.kmTotal)} km</span>`}
+        <div>${botoes}</div></div></div>`;
   }).join('') : vazioMsg('Sem viagens neste período.');
 
   // Abastecimentos
@@ -437,7 +455,7 @@ function desenharListas() {
       <div class="sub">${dataPT(a.data)} · ${num(a.km)} km · ${num(a.litros, 2)} L · ${a.litros ? euro(a.valor / a.litros) + '/L' : ''}
         ${a.temAnterior ? ` · +${num(a.dist)} km · <b>${num((a.litros / a.dist) * 100, 1)} L/100km</b>` : ''}</div></div>
       <div class="direita"><span class="valor negativo">${euro(a.valor)}</span>
-        <div>${btnEditar('abastecimentos', a.id)}${btnApagar('abastecimentos', a.id)}</div></div></div>`).join('')
+        <div>${podeEditar('abastecimentos', a) ? btnEditar('abastecimentos', a.id) + btnApagar('abastecimentos', a.id) : ''}</div></div></div>`).join('')
     : vazioMsg('Sem abastecimentos neste período.');
 
   // Despesas
@@ -447,7 +465,7 @@ function desenharListas() {
       <div class="sub">${dataPT(d.data)} · ${esc(nomeCarrinha(d.carrinhaId) || 'Geral')}${d.descricao ? ' · ' + esc(d.descricao) : ''}
         ${CATEGORIAS_RESERVA.includes(d.categoria) ? ' · <i>da reserva</i>' : ''}</div></div>
       <div class="direita"><span class="valor negativo">${euro(d.valor)}</span>
-        <div>${btnEditar('despesas', d.id)}${btnApagar('despesas', d.id)}</div></div></div>`).join('')
+        <div>${podeEditar('despesas', d) ? btnEditar('despesas', d.id) + btnApagar('despesas', d.id) : ''}</div></div></div>`).join('')
     : vazioMsg('Sem despesas neste período.');
 
   // Carrinhas
@@ -456,7 +474,7 @@ function desenharListas() {
     const docs = estadoDocs(c).map((d) => `<span class="badge ${d.cls}">${d.txt}</span>`).join('');
     return `<div class="item van"><div class="linha">
         <span class="placa"><i>P</i><span>${esc(c.matricula)}</span></span>
-        <div>${btnEditar('carrinhas', c.id)}${btnApagar('carrinhas', c.id)}</div></div>
+        <div>${pode('carrinhas_gerir') ? btnEditar('carrinhas', c.id) + btnApagar('carrinhas', c.id) : ''}</div></div>
       <div class="modelo">${esc(c.modelo || 'Modelo por indicar')}${km != null ? ' · ' + num(km) + ' km' : ''}</div>
       <div class="docs">${docs || '<span class="badge neutro">Sem datas registadas</span>'}</div></div>`;
   }).join('') : vazioMsg('Ainda não adicionou carrinhas.');
@@ -485,6 +503,7 @@ function desenhar() {
   desenharFixos();
   desenharParametros();
   atualizarPreview();
+  if (typeof Equipa !== 'undefined') Equipa.desenhar();
 }
 
 /* ================= Navegação ================= */
@@ -537,9 +556,12 @@ function ligarFormulario(idForm, colecao, montar, msg) {
     const editId = form.dataset.editId;
     if (editId) {
       const i = dados[colecao].findIndex((x) => x.id === editId);
-      if (i >= 0) dados[colecao][i] = { id: editId, ...registo };
+      if (i >= 0) {
+        const internos = Object.fromEntries(Object.entries(dados[colecao][i]).filter(([k]) => k.startsWith('_')));
+        dados[colecao][i] = { ...internos, id: editId, ...registo };
+      }
     } else {
-      dados[colecao].push({ id: novoId(), ...registo });
+      dados[colecao].push({ id: novoId(), _por: typeof Equipa !== 'undefined' ? Equipa.userId() : undefined, ...registo });
     }
     guardar();
     const carrinha = form.elements.carrinhaId?.value;
@@ -578,6 +600,17 @@ function editar(tipo, id) {
 }
 
 ligarFormulario('#formViagens', 'viagens', (f, editId) => {
+  const antigaV = editId ? dados.viagens.find((x) => x.id === editId) : null;
+  if (!pode('precos')) {
+    // Quem não vê preços (ex: condutor) regista só a viagem; os valores ficam para a contabilidade/logística.
+    const base = antigaV || { tipoPreco: 'km', receita: 0, precoKm: null, estado: 'Pendente', fatura: '', faturaFicheiro: null, faturaNome: null };
+    return {
+      tipoPreco: base.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(),
+      destino: f.destino.trim(), kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita: N(base.receita), precoKm: base.precoKm ?? null,
+      portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros), fatura: base.fatura || '', estado: base.estado || 'Pendente',
+      notas: f.notas.trim(), faturaFicheiro: base.faturaFicheiro || null, faturaNome: base.faturaNome || null,
+    };
+  }
   const receita = receitaDoForm(f);
   if (receita <= 0) {
     aviso(f.tipoPreco === 'fechado' ? 'Escreva o valor acordado.' : 'Escreva os km carregados e o preço por km.');
@@ -688,7 +721,7 @@ $('#formParametros').addEventListener('change', (e) => {
 /* ================= Cliques nas listas ================= */
 document.addEventListener('click', (e) => {
   const estado = e.target.closest('.estado');
-  if (estado) {
+  if (estado && pode('precos')) {
     const v = dados.viagens.find((x) => x.id === estado.dataset.id);
     v.estado = ESTADOS[(ESTADOS.indexOf(v.estado) + 1) % ESTADOS.length];
     guardar(); desenhar(); aviso(v.estado === 'Pago' ? '✓ Marcada como paga' : v.estado === 'Pago 50%' ? '◐ Marcada como paga a 50%' : 'Marcada como por cobrar');
@@ -799,12 +832,14 @@ const Nuvem = {
       if (evento === 'PASSWORD_RECOVERY') this.recuperacao = true;
       if (this.user?.email) { try { localStorage.setItem(this.CH_EMAIL, this.user.email); } catch (e) { /* */ } }
       if (this.recuperacao && this.user) setTimeout(() => this.mostrarNovaSenha(true), 200);
-      if (this.user && this.user.id !== antes) setTimeout(() => this.sincronizar(), 0);
+      if (this.user && this.user.id !== antes) setTimeout(() => Equipa.iniciar(this.user), 0);
+      if (!this.user && antes) Equipa.sairDaEmpresa();
       this.ui(); desenharPainel();
     });
     const { data } = await this.cliente.auth.getSession();
     this.user = data.session?.user || null;
     this.ui();
+    if (this.user) Equipa.iniciar(this.user);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
@@ -839,6 +874,9 @@ const Nuvem = {
   // Compara o que está aqui com o que está na internet e acerta os dois.
   async sincronizar() {
     if (!this.user || !this.cliente) return;
+    if (Equipa.ativa()) return Equipa.sincronizar();
+    if (Equipa.aIniciar) return; // ainda a ver se a conta pertence a uma empresa
+    if (Equipa.iniciadoPara !== this.user.id) return Equipa.iniciar(this.user);
     if (this.aEnviar) { this.agendar(); return; }
     this.aEnviar = true; this.estado = 'a sincronizar'; this.ui();
     try {
@@ -879,7 +917,7 @@ const Nuvem = {
   async enviarFatura(viagemId, ficheiro) {
     if (!this.user) return;
     const ext = (ficheiro.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
-    const caminho = `${this.user.id}/${viagemId}-${Date.now()}.${ext}`;
+    const caminho = `${Equipa.pasta('faturas')}/${viagemId}-${Date.now()}.${ext}`;
     aviso('📤 A enviar a fatura…');
     const { error } = await this.cliente.storage.from('faturas').upload(caminho, ficheiro, { contentType: ficheiro.type || undefined, upsert: true });
     if (error) { aviso('❌ A fatura não foi enviada: ' + error.message); return; }
@@ -987,7 +1025,7 @@ const Nuvem = {
     if (!this.user) { icone = '☁️✕'; txt = 'Não tem sessão iniciada: os dados ficam só neste dispositivo.'; }
     else if (this.estado === 'erro' || this.estado === 'offline') { icone = '☁️⚠️'; txt = this.erro; }
     else if (this.estado === 'pendente' || this.estado === 'a sincronizar') { icone = '☁️⏳'; txt = 'A enviar para a internet…'; }
-    else { icone = '☁️✓'; const u = Sync.get().ultima; txt = 'Tudo guardado na internet' + (u ? ' (' + new Date(u).toLocaleString('pt-PT') + ')' : '') + '.'; }
+    else { icone = '☁️✓'; const u = Equipa.ativa() ? Equipa.ultima : Sync.get().ultima; txt = 'Tudo guardado na internet' + (u ? ' (' + new Date(u).toLocaleString('pt-PT') + ')' : '') + '.'; }
     ind.textContent = icone; ind.title = txt;
     if (this.user) { $('#nuvemEmail').textContent = this.user.email; $('#nuvemInfo').textContent = txt; }
   },
@@ -1019,8 +1057,7 @@ $('#nuvemNovaSenha').addEventListener('submit', (e) => {
 $('#nuvemSync').addEventListener('click', () => Nuvem.sincronizar());
 $('#nuvemSair').addEventListener('click', () => Nuvem.sair());
 
-desenhar();
-Nuvem.iniciar();
+// (o arranque — desenhar() e Nuvem.iniciar() — está no fim de equipa.js)
 
 // Permite abrir o site sem internet (cópia guardada no dispositivo).
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

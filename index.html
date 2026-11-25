@@ -34,9 +34,10 @@
 
   <nav class="abas" id="abas">
     <button data-aba="painel" class="ativa"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Painel</span></button>
-    <button data-aba="viagens"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg><span>Viagens</span></button>
-    <button data-aba="abastecer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 8h6M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Abastecer</span></button>
-    <button data-aba="despesas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg><span>Despesas</span></button>
+    <button data-aba="viagens" data-perm="viagens_registar|viagens_ver_todas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg><span>Viagens</span></button>
+    <button data-aba="abastecer" data-perm="abastecimentos_registar|abastecimentos_todos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 8h6M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span>Abastecer</span></button>
+    <button data-aba="despesas" data-perm="despesas_registar|financeiro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg><span>Despesas</span></button>
+    <button data-aba="equipa"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2c.5-.1 1-.2 1.5-.2 2.8 0 5 2.2 5 5"/></svg><span>Equipa</span><b class="num-aba" id="numEquipa" hidden></b></button>
     <button data-aba="mais"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Mais</span></button>
   </nav>
 
@@ -52,13 +53,23 @@
         <div id="listaAvisos" class="avisos"></div>
       </div>
 
+      <div id="saudacao" class="saudacao" hidden></div>
+
+      <div id="painelPessoal" data-sem-perm="financeiro" hidden>
+        <div class="cartoes" id="cartoesPessoais"></div>
+        <div class="atalhos">
+          <button type="button" class="atalho" data-ir="equipa" data-foco="formOcorrencias">⚠️<span>Reportar problema</span></button>
+          <button type="button" class="atalho" data-ir="equipa" data-foco="formFerias">🏖️<span>Pedir férias</span></button>
+          <button type="button" class="atalho" data-ir="viagens" data-perm="viagens_registar">🚚<span>Nova viagem</span></button>
+          <button type="button" class="atalho" data-ir="abastecer" data-perm="abastecimentos_registar">⛽<span>Abastecer</span></button>
+        </div>
+      </div>
+
+      <div data-perm="financeiro">
       <div class="cartoes">
         <div class="cartao verde"><small>Receita</small><strong id="totReceita">0 €</strong></div>
         <div class="cartao vermelho"><small>Gastos</small><strong id="totGastos">0 €</strong></div>
         <div class="cartao destaque"><small>Lucro</small><strong id="totLucro">0 €</strong></div>
-      </div>
-      <div id="blocoAvisos" hidden>
-        <div id="listaAvisos" class="avisos"></div>
       </div>
 
       <div class="cartoes">
@@ -86,6 +97,7 @@
 
       <h2>Para onde vai o dinheiro</h2>
       <div id="categoriasPainel" class="barras"></div>
+      </div>
     </section>
 
     <!-- ================= VIAGENS ================= -->
@@ -105,6 +117,7 @@
           <label>Km carregado<input type="number" name="kmCarregado" min="0" step="1" inputmode="numeric"></label>
           <label>Km em vazio<input type="number" name="kmVazio" min="0" step="1" inputmode="numeric"></label>
         </div>
+        <div id="blocoPrecos" data-perm="precos">
         <div class="seletor" role="radiogroup" aria-label="Como cobra a viagem">
           <label><input type="radio" name="tipoPreco" value="km" checked><span>Preço por km</span></label>
           <label><input type="radio" name="tipoPreco" value="fechado"><span>Valor acordado</span></label>
@@ -112,11 +125,13 @@
         <label id="campoPrecoKm">Preço por km carregado (€)<input type="number" name="precoKm" min="0" step="0.001" inputmode="decimal" placeholder="ex: 0,80"></label>
         <label id="campoReceita" hidden>Valor acordado da viagem (€)<input type="number" name="receita" min="0" step="0.01" inputmode="decimal" placeholder="ex: 350"></label>
         <p class="info-receita" id="infoReceita"></p>
+        </div>
         <div class="grid3">
           <label>Portagens (€)<input type="number" name="portagens" min="0" step="0.01" inputmode="decimal"></label>
           <label>Comida (€)<input type="number" name="alimentacao" min="0" step="0.01" inputmode="decimal"></label>
           <label>Outros (€)<input type="number" name="outros" min="0" step="0.01" inputmode="decimal"></label>
         </div>
+        <div data-perm="precos">
         <div class="grid2">
           <label>Nº fatura<input type="text" name="fatura"></label>
           <label>Pagamento
@@ -125,11 +140,14 @@
         </div>
         <label>Fatura (PDF ou foto)<input type="file" name="faturaFile" accept="application/pdf,image/*"></label>
         <p class="ajuda" id="faturaInfo">Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.</p>
+        </div>
         <label>Notas<input type="text" name="notas"></label>
 
+        <div data-perm="precos">
         <div id="previewViagem" class="preview"></div>
         <p class="ajuda">O gasóleo de cada viagem é estimado pelos km e pela média real das suas carrinhas (ou pelos Parâmetros).
           Também pode usar este formulário para ver se uma carga compensa antes de a aceitar.</p>
+        </div>
         <button type="submit" class="principal">Guardar viagem</button>
         <button type="button" class="cancelar" hidden>Cancelar edição</button>
       </form>
@@ -195,6 +213,125 @@
       <div id="listaDespesas" class="lista"></div>
     </section>
 
+    <!-- ================= EQUIPA ================= -->
+    <section id="equipa" class="aba">
+      <!-- Sem empresa -->
+      <div id="equipaInativa">
+        <h2>👥 Equipa</h2>
+        <div class="caixa" id="equipaSemConta">
+          <p>Para pedir férias, reportar problemas nas carrinhas e trabalhar em equipa, entre primeiro na sua conta em <b>⚙️ Mais → Guardar na internet</b>.</p>
+        </div>
+        <div class="caixa" id="equipaSemEmpresa" hidden>
+          <p><b>Esta conta ainda não pertence a nenhuma empresa.</b></p>
+          <p>👷 <b>É funcionário?</b> Peça ao RH ou ao patrão para o adicionar com o email <b id="meuEmailConvite"></b>. Depois feche e volte a abrir o site.</p>
+          <hr>
+          <form id="formCriarEmpresa">
+            <p>👔 <b>É o dono?</b> Crie a empresa. Os dados que já tem neste site passam para a empresa e fica como <b>Patrão</b>.</p>
+            <label>Nome da empresa<input type="text" name="empresa" value="Transportes Freitas" required></label>
+            <label>O seu nome<input type="text" name="nome" required placeholder="ex: João Freitas"></label>
+            <button type="submit" class="principal">Criar empresa</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Com empresa -->
+      <div id="equipaAtiva" hidden>
+        <div class="perfil" id="perfil"></div>
+
+        <h2>⚠️ Reportar problema na carrinha</h2>
+        <form id="formOcorrencias" class="formulario">
+          <h3 class="tituloForm" data-novo="O que se passa?">O que se passa?</h3>
+          <div class="grid2">
+            <label>Carrinha<select name="carrinhaId" class="selCarrinha" required></select></label>
+            <label>Tipo
+              <select name="tipo">
+                <option>Avaria mecânica</option><option>Luz de aviso no painel</option><option>Pneu</option>
+                <option>Travões</option><option>Barulho estranho</option><option>Acidente / dano</option>
+                <option>Limpeza / interior</option><option>Documentos</option><option>Outro</option>
+              </select>
+            </label>
+          </div>
+          <label>Urgência
+            <select name="urgencia">
+              <option value="baixa">🟢 Posso continuar a trabalhar</option>
+              <option value="media">🟠 Precisa de ver em breve</option>
+              <option value="alta">🔴 Carrinha parada / perigoso</option>
+            </select>
+          </label>
+          <label>Descreva o problema<input type="text" name="descricao" required placeholder="ex: luz do motor acesa desde Coimbra"></label>
+          <div class="grid2">
+            <label>Km atuais<input type="number" name="km" min="0" step="1" inputmode="numeric"></label>
+            <label>Foto (opcional)<input type="file" name="fotoFile" accept="image/*"></label>
+          </div>
+          <button type="submit" class="principal">Enviar aviso</button>
+          <button type="button" class="cancelar" hidden>Cancelar edição</button>
+        </form>
+
+        <h2>🔧 Problemas das carrinhas</h2>
+        <div class="filtros" id="filtroOcorrencias">
+          <button type="button" class="chip ativo" data-f="abertos">Por resolver</button>
+          <button type="button" class="chip" data-f="todos">Todos</button>
+        </div>
+        <div id="listaOcorrencias" class="lista espaco"></div>
+
+        <h2>🏖️ Férias e folgas</h2>
+        <div id="saldoFerias" class="cartoes"></div>
+        <form id="formFerias" class="formulario">
+          <h3 class="tituloForm" data-novo="Pedir férias ou folga">Pedir férias ou folga</h3>
+          <label>Tipo
+            <select name="tipo">
+              <option>Férias</option><option>Folga</option><option>Consulta médica</option>
+              <option>Baixa médica</option><option>Assunto pessoal</option><option>Formação</option>
+            </select>
+          </label>
+          <div class="grid2">
+            <label>De<input type="date" name="inicio" required></label>
+            <label>Até<input type="date" name="fim" required></label>
+          </div>
+          <p class="info-receita" id="infoDiasFerias"></p>
+          <label>Nota (opcional)<input type="text" name="nota" placeholder="ex: casamento da irmã"></label>
+          <button type="submit" class="principal">Enviar pedido</button>
+          <button type="button" class="cancelar" hidden>Cancelar edição</button>
+        </form>
+        <div id="listaMinhasFerias" class="lista espaco"></div>
+
+        <div data-perm="ferias_aprovar">
+          <h2>✅ Pedidos por aprovar</h2>
+          <div id="listaAprovar" class="lista"></div>
+        </div>
+
+        <h2>📅 Ausências da equipa</h2>
+        <div id="listaAusencias" class="lista"></div>
+
+        <h2>👥 Pessoas</h2>
+        <div id="listaPessoas" class="lista"></div>
+        <form id="formPessoas" class="formulario" data-perm="pessoas_gerir">
+          <h3 class="tituloForm" data-novo="Adicionar pessoa">Adicionar pessoa</h3>
+          <div class="grid2">
+            <label>Nome<input type="text" name="nome" required></label>
+            <label>Papel<select name="papel" id="selPapel"></select></label>
+          </div>
+          <label>Email (é com este email que a pessoa cria a conta)<input type="email" name="email" required autocapitalize="off"></label>
+          <div class="grid2">
+            <label>Telemóvel<input type="tel" name="telefone" inputmode="tel"></label>
+            <label>Dias de férias / ano<input type="number" name="dias_ferias" min="0" max="60" value="22" inputmode="numeric"></label>
+          </div>
+          <label>Data de entrada<input type="date" name="data_entrada"></label>
+          <button type="submit" class="principal">Guardar pessoa</button>
+          <button type="button" class="cancelar" hidden>Cancelar edição</button>
+        </form>
+
+        <div data-perm="permissoes_gerir">
+          <h2>🔐 O que cada papel pode fazer</h2>
+          <div class="caixa">
+            <label>Papel<select id="selPapelPermissoes"></select></label>
+            <div id="listaPermissoes" class="permissoes"></div>
+            <p class="ajuda">Todas as pessoas podem sempre: pedir férias, reportar problemas, ver as carrinhas e a equipa. O Patrão pode tudo.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= MAIS ================= -->
     <section id="mais" class="aba">
       <h2>☁️ Guardar na internet</h2>
@@ -247,7 +384,7 @@
         <p class="ajuda" id="infoUltimaCopia"></p>
         <div class="botoes">
           <button type="button" class="btnExportar">⬇️ Guardar cópia</button>
-          <label class="botao">⬆️ Carregar cópia<input type="file" id="ficheiroImportar" accept=".json,application/json" hidden></label>
+          <label class="botao" data-perm="permissoes_gerir">⬆️ Carregar cópia<input type="file" id="ficheiroImportar" accept=".json,application/json" hidden></label>
         </div>
         <div class="botoes">
           <button type="button" id="btnCsvViagens">📄 Viagens para Excel</button>
@@ -256,8 +393,9 @@
       </div>
 
       <h2>🚐 Carrinhas</h2>
+      <p class="ajuda" data-sem-perm="carrinhas_gerir" hidden>Só a logística ou o mecânico podem alterar as carrinhas.</p>
       <div id="listaCarrinhas" class="lista espaco"></div>
-      <form id="formCarrinhas" class="formulario">
+      <form id="formCarrinhas" class="formulario" data-perm="carrinhas_gerir">
         <h3 class="tituloForm" data-novo="Adicionar carrinha">Adicionar carrinha</h3>
         <div class="grid2">
           <label>Matrícula<input type="text" name="matricula" required placeholder="AA-00-AA" autocapitalize="characters"></label>
@@ -279,6 +417,7 @@
         <button type="button" class="cancelar" hidden>Cancelar edição</button>
       </form>
 
+      <div data-perm="financeiro">
       <h2>🧾 Custos fixos</h2>
       <p class="ajuda">Entram em todos os meses, mesmo com poucas viagens. Se um custo for anual, escolha "Anual" e é dividido por 12.</p>
       <div id="listaFixos" class="lista espaco"></div>
@@ -311,9 +450,12 @@
         <p class="ajuda">Custo mensal do ordenado para a empresa: <b id="custoOrdenado">—</b></p>
       </form>
 
+      </div>
+      <div data-perm="permissoes_gerir">
       <h2>⚠️ Zona perigosa</h2>
       <div class="botoes espaco">
         <button type="button" id="btnApagarTudo" class="perigo">Apagar todos os dados</button>
+      </div>
       </div>
     </section>
   </main>
@@ -322,5 +464,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="equipa.js"></script>
 </body>
 </html>
