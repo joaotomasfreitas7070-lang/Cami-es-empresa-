@@ -120,9 +120,11 @@
         <div class="grid2">
           <label>Nº fatura<input type="text" name="fatura"></label>
           <label>Pagamento
-            <select name="estado"><option>Pendente</option><option>Pago</option></select>
+            <select name="estado"><option>Pendente</option><option>Pago 50%</option><option>Pago</option></select>
           </label>
         </div>
+        <label>Fatura (PDF ou foto)<input type="file" name="faturaFile" accept="application/pdf,image/*"></label>
+        <p class="ajuda" id="faturaInfo">Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.</p>
         <label>Notas<input type="text" name="notas"></label>
 
         <div id="previewViagem" class="preview"></div>

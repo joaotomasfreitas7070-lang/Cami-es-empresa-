@@ -133,6 +133,14 @@ function gasoleoPorKm(carrinhaId) {
     ?? (N(P().consumo) / 100) * N(P().precoGasoleo);
 }
 
+// Estados de pagamento: Pendente → Pago 50% → Pago.
+const ESTADOS = ['Pendente', 'Pago 50%', 'Pago'];
+const ESTADO_UI = { Pendente: ['mau', '⏳ Por cobrar'], 'Pago 50%': ['medio', '◐ Pago 50%'], Pago: ['ok', '✓ Pago'] };
+function porCobrarViagem(v) {
+  if (v.estado === 'Pago') return 0;
+  return v.estado === 'Pago 50%' ? N(v.receita) / 2 : N(v.receita);
+}
+
 function calcViagem(v) {
   const kmTotal = N(v.kmCarregado) + N(v.kmVazio);
   const gasoleo = kmTotal * gasoleoPorKm(v.carrinhaId);
@@ -165,7 +173,7 @@ function resumoPeriodo(carrinhaId /* undefined = todas */) {
     r.receita += N(v.receita); r.portagens += N(v.portagens); r.alimentacao += N(v.alimentacao); r.outros += N(v.outros);
     r.gasoleoEst += c.gasoleo; r.kmCarregado += N(v.kmCarregado); r.kmVazio += N(v.kmVazio); r.lucroViagens += c.lucro;
     if (N(v.kmCarregado) > 0) r.receitaComKm += N(v.receita);
-    if (v.estado !== 'Pago') r.porCobrar += N(v.receita);
+    r.porCobrar += porCobrarViagem(v);
   });
   r.km = r.kmCarregado + r.kmVazio;
   r.pctVazio = r.km > 0 ? r.kmVazio / r.km : null;
@@ -413,7 +421,8 @@ function desenharListas() {
     return `<div class="item"><div class="info">
         <div class="titulo">${rota}</div><div class="sub">${detalhes}</div>
         <div class="sub">${c.aval ? `<span class="badge ${c.aval.cls}">${c.aval.txt}</span> ` : ''}
-          <button class="badge estado ${v.estado === 'Pago' ? 'ok' : 'mau'}" data-id="${v.id}">${v.estado === 'Pago' ? '✓ Pago' : '⏳ Por cobrar'}</button>
+          <button class="badge estado ${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[0]}" data-id="${v.id}">${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[1]}</button>
+          ${v.faturaFicheiro ? `<button class="badge neutro abrirFatura" data-id="${v.id}">📄 Fatura${v.fatura ? ' ' + esc(v.fatura) : ''}</button>` : ''}
           ${v.notas ? ' ' + esc(v.notas) : ''}</div>
       </div>
       <div class="direita"><span class="valor">${euro(v.receita)}</span>
@@ -508,6 +517,7 @@ const FORMS = {};
 
 function sairEdicao(form) {
   delete form.dataset.editId;
+  if (form.id === 'formViagens') $('#faturaInfo').textContent = 'Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.';
   form.reset();
   if (form.elements.data) form.elements.data.value = hojeISO();
   const t = form.querySelector('.tituloForm');
@@ -555,6 +565,11 @@ function editar(tipo, id) {
     form.querySelector(`[name=tipoPreco][value=${tp}]`).checked = true;
     form.elements.receita.value = reg.receita || '';
   }
+  if (tipo === 'viagens') {
+    $('#faturaInfo').textContent = reg.faturaFicheiro
+      ? `Fatura guardada: ${reg.faturaNome || 'ficheiro'}. Escolha outro ficheiro só se a quiser substituir.`
+      : 'Ainda sem fatura. Escolha o PDF ou tire uma foto.';
+  }
   form.dataset.editId = id;
   form.querySelector('.tituloForm').textContent = '✏️ A editar';
   form.querySelector('.cancelar').hidden = false;
@@ -562,17 +577,25 @@ function editar(tipo, id) {
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-ligarFormulario('#formViagens', 'viagens', (f) => {
+ligarFormulario('#formViagens', 'viagens', (f, editId) => {
   const receita = receitaDoForm(f);
   if (receita <= 0) {
     aviso(f.tipoPreco === 'fechado' ? 'Escreva o valor acordado.' : 'Escreva os km carregados e o preço por km.');
     return null;
   }
+  const id = editId || novoId();
+  const antiga = editId ? dados.viagens.find((x) => x.id === editId) : null;
+  const ficheiro = f.faturaFile && f.faturaFile.size ? f.faturaFile : null;
+  if (ficheiro) {
+    if (!Nuvem.user) { aviso('Para guardar a fatura, entre na conta em ⚙️ Mais.'); return null; }
+    setTimeout(() => Nuvem.enviarFatura(id, ficheiro), 0);
+  }
   return {
-  tipoPreco: f.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
+  id, tipoPreco: f.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
   kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita, precoKm: f.tipoPreco === 'km' ? N(f.precoKm) : null,
   portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros),
   fatura: f.fatura.trim(), estado: f.estado, notas: f.notas.trim(),
+  faturaFicheiro: antiga?.faturaFicheiro || null, faturaNome: antiga?.faturaNome || null,
   };
 }, '🚚 Viagem guardada');
 
@@ -667,10 +690,12 @@ document.addEventListener('click', (e) => {
   const estado = e.target.closest('.estado');
   if (estado) {
     const v = dados.viagens.find((x) => x.id === estado.dataset.id);
-    v.estado = v.estado === 'Pago' ? 'Pendente' : 'Pago';
-    guardar(); desenhar(); aviso(v.estado === 'Pago' ? '✓ Marcada como paga' : 'Marcada como por cobrar');
+    v.estado = ESTADOS[(ESTADOS.indexOf(v.estado) + 1) % ESTADOS.length];
+    guardar(); desenhar(); aviso(v.estado === 'Pago' ? '✓ Marcada como paga' : v.estado === 'Pago 50%' ? '◐ Marcada como paga a 50%' : 'Marcada como por cobrar');
     return;
   }
+  const fat = e.target.closest('.abrirFatura');
+  if (fat) { Nuvem.abrirFatura(dados.viagens.find((x) => x.id === fat.dataset.id)); return; }
   const ed = e.target.closest('.editar');
   if (ed) { editar(ed.dataset.tipo, ed.dataset.id); return; }
 
@@ -683,6 +708,7 @@ document.addEventListener('click', (e) => {
     dados.abastecimentos = dados.abastecimentos.filter((a) => a.carrinhaId !== id);
     ['despesas', 'viagens'].forEach((k) => dados[k].forEach((x) => { if (x.carrinhaId === id) x.carrinhaId = ''; }));
   } else if (!confirm('Apagar este registo?')) return;
+  if (tipo === 'viagens') { const v = dados.viagens.find((x) => x.id === id); if (v?.faturaFicheiro) Nuvem.apagarFatura(v.faturaFicheiro); }
   dados[tipo] = dados[tipo].filter((x) => x.id !== id);
   if (FORMS[tipo]?.dataset.editId === id) sairEdicao(FORMS[tipo]);
   guardar(); desenhar(); aviso('Apagado');
@@ -843,6 +869,35 @@ const Nuvem = {
     } finally {
       this.aEnviar = false; this.ui();
     }
+  },
+
+  // ---- Faturas (Supabase Storage, bucket privado "faturas") ----
+  async enviarFatura(viagemId, ficheiro) {
+    if (!this.user) return;
+    const ext = (ficheiro.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+    const caminho = `${this.user.id}/${viagemId}-${Date.now()}.${ext}`;
+    aviso('📤 A enviar a fatura…');
+    const { error } = await this.cliente.storage.from('faturas').upload(caminho, ficheiro, { contentType: ficheiro.type || undefined, upsert: true });
+    if (error) { aviso('❌ A fatura não foi enviada: ' + error.message); return; }
+    const v = dados.viagens.find((x) => x.id === viagemId);
+    if (!v) return;
+    const anterior = v.faturaFicheiro;
+    v.faturaFicheiro = caminho; v.faturaNome = ficheiro.name;
+    guardar(); desenhar(); aviso('📄 Fatura guardada');
+    if (anterior && anterior !== caminho) this.apagarFatura(anterior);
+  },
+
+  async abrirFatura(v) {
+    if (!v?.faturaFicheiro) return;
+    if (!this.user) { aviso('Entre na conta em ⚙️ Mais para abrir faturas.'); return; }
+    const janela = window.open('', '_blank'); // abre já (o iPhone bloqueia janelas abertas depois de esperar)
+    const { data, error } = await this.cliente.storage.from('faturas').createSignedUrl(v.faturaFicheiro, 3600);
+    if (error || !data?.signedUrl) { janela?.close(); aviso('❌ Não foi possível abrir a fatura.'); return; }
+    if (janela) janela.location.href = data.signedUrl; else location.href = data.signedUrl;
+  },
+
+  async apagarFatura(caminho) {
+    if (this.user && caminho) await this.cliente.storage.from('faturas').remove([caminho]);
   },
 
   async entrar(email, senha) {
