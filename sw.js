@@ -1,8 +1,8 @@
 // Guarda uma cópia do site no dispositivo para abrir sem internet.
 // Estratégia: tenta sempre a versão mais recente da internet; sem rede usa a cópia.
-const CACHE = 'freitas-v3';
+const CACHE = 'freitas-v4';
 const FICHEIROS = [
-  './', 'index.html', 'style.css', 'app.js', 'equipa.js', 'config.js', 'manifest.webmanifest',
+  './', 'index.html', 'style.css', 'app.js', 'equipa.js', 'rh.js', 'config.js', 'manifest.webmanifest',
   'img/logo.png', 'img/logo-128.png', 'img/favicon.png', 'img/apple-touch-icon.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js',
 ];

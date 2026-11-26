@@ -365,3 +365,57 @@ button.mini.mau { color: var(--vermelho); border-color: var(--vermelho); }
 .meus-dados label { display: block; margin: 12px 0 0; font-size: .85rem; font-weight: 600; color: var(--suave); }
 a.botao-link { display: inline-block; text-decoration: none; color: var(--texto); border: 1px solid var(--borda); background: var(--cartao);
   padding: 7px 11px; border-radius: 9px; font-size: .84rem; font-weight: 600; }
+
+/* ============ Entrada, sub-separadores, escalas, salários ============ */
+.ecra-carregar { position: fixed; inset: 0; display: none; place-items: center; background: var(--preto); z-index: 50; }
+.ecra-carregar img { width: min(46vw, 220px); animation: pulsar 1.4s ease-in-out infinite; }
+@keyframes pulsar { 50% { transform: scale(1.04); opacity: .85; } }
+body.a-arrancar .ecra-carregar { display: grid; }
+body.a-arrancar > header, body.a-arrancar > nav, body.a-arrancar > main, body.a-arrancar > #ecraLogin { display: none !important; }
+body.bloqueado > header, body.bloqueado > nav, body.bloqueado > main { display: none !important; }
+body.bloqueado { padding-bottom: 0; }
+.ecra-login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px;
+  background: radial-gradient(120% 80% at 50% 0%, #2a0d0c 0%, var(--preto) 60%); }
+.login-caixa { width: 100%; max-width: 380px; text-align: center; }
+.login-logo { width: min(62vw, 230px); filter: drop-shadow(0 10px 30px rgba(225, 6, 0, .35)); }
+.login-sub { color: #aab2bd; margin: 6px 0 18px; font-weight: 600; letter-spacing: .02em; }
+#loginForm { background: var(--cartao); color: var(--texto); border-radius: 18px; padding: 6px 18px 18px; text-align: left; box-shadow: 0 20px 50px rgba(0, 0, 0, .45); }
+#loginForm label { display: block; margin: 12px 0 0; font-size: .85rem; font-weight: 600; color: var(--suave); }
+.login-links { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.subnav { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 14px 16px 6px;
+  scrollbar-width: none; position: sticky; top: 108px; z-index: 3; background: var(--fundo); }
+.subnav::-webkit-scrollbar { display: none; }
+.subnav .chip { white-space: nowrap; flex: none; }
+.sub-painel:not(.ativo) { display: none; }
+
+.semana-nav { display: flex; align-items: center; gap: 8px; }
+.semana-nav b { flex: 1; text-align: center; }
+.semana { display: flex; flex-direction: column; gap: 8px; }
+.dia { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 10px 12px; box-shadow: var(--sombra); }
+.dia.hoje { border-color: var(--marca); box-shadow: 0 0 0 1px var(--marca) inset; }
+.dia.fds { background: var(--cartao-2); }
+.dia-titulo { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: .9rem; }
+.dia-titulo small { color: var(--suave); font-weight: 600; }
+.turno { display: flex; align-items: center; gap: 10px; padding: 8px 0 0; }
+.turno .hora { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 92px; }
+.turno .quem { flex: 1; min-width: 0; }
+.turno .quem small { display: block; color: var(--suave); }
+.turno.meu .hora { color: var(--marca); }
+.ausente { font-size: .8rem; color: var(--suave); padding-top: 6px; }
+
+.recibo { margin-top: 14px; border: 1px dashed var(--borda); border-radius: 12px; padding: 12px 14px; background: var(--cartao-2); font-size: .9rem; }
+.recibo .l { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.recibo .l span:first-child { color: var(--suave); }
+.recibo .l.forte { font-weight: 800; border-top: 1px solid var(--borda); margin-top: 4px; padding-top: 7px; }
+.recibo .l.forte span:first-child { color: var(--texto); }
+.recibo h4 { margin: 10px 0 2px; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+#impressao { display: none; }
+@media print {
+  body { padding: 0 !important; background: #fff !important; }
+  body::before { display: none !important; }
+  body > header, body > nav, body > main, body > #ecraLogin, body > #ecraCarregar, body > #aviso { display: none !important; }
+  #impressao { display: block !important; color: #000; font-family: Inter, Arial, sans-serif; font-size: 11px; }
+}
+
+.semana-nav .seta { color: var(--texto); background: var(--cartao); border: 1px solid var(--borda); }

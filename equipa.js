@@ -26,8 +26,12 @@ const PERMISSOES = [
   ['pessoas_gerir', 'Adicionar, alterar e remover pessoas'],
   ['avisos_aniversarios', 'Ser avisado dos aniversários (1 dia antes e no dia)'],
   ['avisos_ferias', 'Ser avisado das férias da equipa (1 semana antes)'],
+  ['salarios', 'Ver e processar salários (fichas, recibos, mapa) — dados sensíveis'],
+  ['clientes', 'Gerir a lista de clientes'],
+  ['escalas_gerir', 'Fazer as escalas e turnos'],
 ];
-const TIPOS_SYNC = ['carrinhas', 'viagens', 'abastecimentos', 'despesas', 'custosFixos', 'ferias', 'ocorrencias'];
+const TIPOS_SYNC = ['carrinhas', 'viagens', 'abastecimentos', 'despesas', 'custosFixos', 'ferias', 'ocorrencias',
+  'salarios', 'processamentos', 'clientes', 'escalas'];
 const URGENCIA = { baixa: ['ok', '🟢 Pode trabalhar'], media: ['medio', '🟠 Ver em breve'], alta: ['mau', '🔴 Parada'] };
 const ESTADO_OC = { Aberto: ['mau', 'Por resolver'], 'Em reparação': ['medio', '🔧 Em reparação'], Resolvido: ['ok', '✓ Resolvido'] };
 const ESTADO_FER = { Pendente: ['medio', '⏳ À espera'], Aprovado: ['ok', '✓ Aprovado'], Recusado: ['mau', '✕ Recusado'], Cancelado: ['neutro', 'Cancelado'] };
@@ -130,6 +134,9 @@ const Equipa = {
       case 'carrinhas': return this.pode('carrinhas_gerir');
       case 'ocorrencias': return this.gereProblemas() || (meu && r.estado === 'Aberto');
       case 'ferias': return this.pode('ferias_aprovar') || (meu && r.estado === 'Pendente');
+      case 'salarios': case 'processamentos': return this.pode('salarios');
+      case 'clientes': return this.pode('clientes');
+      case 'escalas': return this.pode('escalas_gerir');
       default: return this.pode('financeiro');
     }
   },
@@ -598,6 +605,20 @@ const Equipa = {
             sub: `${dataPT(f.inicio)} → ${dataPT(f.fim)} · ${f.dias} dia${f.dias === 1 ? '' : 's'} úte${f.dias === 1 ? 'il' : 'is'}` });
         });
     }
+    // Os meus turnos de hoje e amanhã
+    const hojeT = hojeISO();
+    const amanhaT = (() => { const d = new Date(hojeT + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+    (dados.escalas || []).filter((t) => t.userId === this.user.id && (t.data === hojeT || t.data === amanhaT))
+      .sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio))
+      .forEach((t) => out.push({ cls: 'ok', icone: '📅', ir: 'equipa', foco: 'listaEscalas',
+        txt: `${t.data === hojeT ? 'Hoje' : 'Amanhã'}: turno das ${t.inicio} às ${t.fim}`,
+        sub: [dados.carrinhas.find((c) => c.id === t.carrinhaId)?.matricula, t.notas].filter(Boolean).join(' · ') || 'Escala' }));
+    // Recibo novo
+    const semanaR = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+    (dados.processamentos || []).filter((p) => p.userId === this.user.id && ['Fechado', 'Pago'].includes(p.estado) && (p.fechadoEm || '') >= semanaR)
+      .forEach((p) => out.push({ cls: 'ok', icone: '🧾', ir: 'equipa', foco: 'listaRecibos',
+        txt: `Recibo de ${MESES[Number(p.mes.slice(5, 7)) - 1]} disponível${p.estado === 'Pago' ? ' (pago)' : ''}`,
+        sub: 'Toque para ver' }));
     const semana = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
     dados.ferias.filter((f) => this.meu(f) && ['Aprovado', 'Recusado'].includes(f.estado) && (f.decididoEm || '') >= semana)
       .forEach((f) => out.push({
@@ -615,6 +636,7 @@ const Equipa = {
     $$('[data-sem-perm]').forEach((el) => { el.hidden = el.dataset.semPerm.split('|').some((p) => this.pode(p)); });
     const ativa = $('#abas button.ativa');
     if (ativa && ativa.hidden) $('#abas button[data-aba="painel"]').click();
+    $$('[data-subnav]').forEach((nav) => mostrarSub(nav, null));
 
     const ok = !!this.empresa;
     $('#equipaAtiva').hidden = !ok;
@@ -789,6 +811,24 @@ const Equipa = {
   },
 };
 
+/* ---------- Sub-separadores (Equipa: Problemas/Férias/...; Viagens: Viagens/Clientes) ---------- */
+const subEscolhido = {};
+function mostrarSub(nav, nome) {
+  if (!nav) return;
+  const chave = nav.dataset.subnav;
+  const chips = [...nav.querySelectorAll('[data-sub]')].filter((c) => !c.hidden);
+  if (!chips.length) return;
+  nome = nome || subEscolhido[chave];
+  if (!chips.some((c) => c.dataset.sub === nome)) nome = chips[0].dataset.sub;
+  subEscolhido[chave] = nome;
+  chips.forEach((c) => c.classList.toggle('ativo', c.dataset.sub === nome));
+  nav.parentElement.querySelectorAll(':scope > [data-sub-painel]').forEach((p) => p.classList.toggle('ativo', p.dataset.subPainel === nome));
+}
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-subnav] [data-sub]');
+  if (c) mostrarSub(c.closest('[data-subnav]'), c.dataset.sub);
+});
+
 /* ---------- Formulários e botões ---------- */
 ligarFormulario('#formOcorrencias', 'ocorrencias', (f, editId) => {
   const antiga = editId ? dados.ocorrencias.find((x) => x.id === editId) : null;
@@ -861,7 +901,14 @@ document.addEventListener('click', (e) => {
   const d = t.dataset;
   if (d.ir) {
     $(`#abas button[data-aba="${d.ir}"]`).click();
-    if (d.foco) setTimeout(() => { const el = $('#' + d.foco); if (!el) return; if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
+    if (d.foco) setTimeout(() => {
+      const el = $('#' + d.foco);
+      if (!el) return;
+      const painel = el.closest('[data-sub-painel]');
+      if (painel) mostrarSub(painel.parentElement.querySelector(':scope > [data-subnav]'), painel.dataset.subPainel);
+      if (el.tagName === 'DETAILS') el.open = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
   } else if (d.oc) Equipa.mudarOcorrencia(d.oc, d.estado);
   else if (d.ferDecidir) Equipa.decidirFerias(d.ferDecidir, d.aprovar === '1');
   else if (d.ferCancelar) {
@@ -881,6 +928,4 @@ document.addEventListener('click', (e) => {
   } else if (t.classList.contains('abrirFicheiro')) Equipa.abrirFicheiro(d.caminho);
 });
 
-/* ---------- Arranque ---------- */
-desenhar();
-Nuvem.iniciar();
+/* (o arranque está no fim de rh.js) */

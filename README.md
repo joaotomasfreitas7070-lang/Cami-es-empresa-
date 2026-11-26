@@ -39,3 +39,14 @@ na base de dados (Row Level Security), não só no ecrã.
 - 🎂 Aniversários: 1 dia antes e no próprio dia (RH e Marketing; permissão "avisos_aniversarios"). Também os anos de casa.
 - 🏖️ Férias aprovadas que começam nos próximos 7 dias (RH e Logística; permissão "avisos_ferias").
 - 👤 Cada pessoa é lembrada de completar telemóvel e data de nascimento; o RH vê quem tem dados em falta.
+
+## Salários, clientes, escalas e relatórios (atualização 3)
+Correr `supabase/equipa-3.sql` no Supabase (uma vez).
+- **Entrar primeiro:** com a internet ligada, o site abre no ecrã de entrada.
+- **💶 Salários** (RH, Contabilidade, Patrão): fichas (ordenado, IRS %, sub. alimentação, NIF/NISS/IBAN),
+  processamento mensal com faltas, horas extra (+25 % / +37,5 % / +50 %), adiantamentos, 14 ordenados
+  (subsídios de férias e Natal nos meses escolhidos), SS, IRS, FCT, seguro AT, custo empresa, mapa (PDF/Excel).
+  Sem km nem ajudas de custo. Cada pessoa vê só os seus recibos depois de o mês ser fechado.
+- **🏢 Clientes** (Viagens → Clientes): ficha, histórico, faturado, por cobrar, preço habitual €/km.
+- **📅 Escalas** (Equipa → Escalas): turnos por pessoa/carrinha, repetição, avisos de conflitos e férias.
+- **📄 Relatórios em PDF:** relatório do mês, mapa de salários e recibos (imprimir / guardar como PDF).

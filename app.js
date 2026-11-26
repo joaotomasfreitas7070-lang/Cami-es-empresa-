@@ -21,6 +21,7 @@ function normalizar(d, semPadroes = false) {
   const out = {
     carrinhas: d.carrinhas || [], viagens: d.viagens || [], abastecimentos: d.abastecimentos || [],
     despesas: d.despesas || [], ferias: d.ferias || [], ocorrencias: d.ocorrencias || [],
+    salarios: d.salarios || [], processamentos: d.processamentos || [], clientes: d.clientes || [], escalas: d.escalas || [],
     custosFixos: d.custosFixos || (semPadroes ? [] : FIXOS_BASE.map(([nome, valor]) => ({ id: novoId(), nome, valor, periodo: 'Mensal' }))),
     parametros: { ...PARAMETROS_BASE, ...(d.parametros || {}) },
     ultimaCopia: d.ultimaCopia || null,
@@ -209,7 +210,8 @@ function resumoPeriodo(carrinhaId /* undefined = todas */) {
   r.fixos = fixosMes() * meses;
   r.reserva = r.km * N(P().reserva);
   r.gastosViagens = r.portagens + r.alimentacao + r.outros + r.gasoleo;
-  r.gastos = r.gastosViagens + r.outrasDespesas + r.fixos + r.reserva;
+  r.salarios = carrinhaId === undefined && typeof Salarios !== 'undefined' ? Salarios.custoPeriodo() : 0;
+  r.gastos = r.gastosViagens + r.outrasDespesas + r.fixos + r.reserva + r.salarios;
   r.lucro = r.receita - r.gastos;
   r.ordenado = custoOrdenadoMes() * meses;
   r.sobra = r.lucro - r.ordenado;
@@ -323,6 +325,7 @@ function desenharPainel() {
     t.outros ? linhaR('− Outros das viagens', euro(t.outros)) : '',
     t.outrasDespesas ? linhaR('− Outras despesas', euro(t.outrasDespesas)) : '',
     linhaR('− Custos fixos', euro(t.fixos)),
+    t.salarios ? linhaR('− Salários da equipa (custo empresa)', euro(t.salarios)) : '',
     linhaR(`− Reserva de manutenção (${num(t.km)} km)`, euro(t.reserva)),
     linhaR('LUCRO antes do ordenado', `<span class="${cls(t.lucro)}">${euro(t.lucro)}</span>`, 'forte'),
     linhaR('− Custo do ordenado', euro(t.ordenado)),
@@ -504,6 +507,7 @@ function desenhar() {
   desenharParametros();
   atualizarPreview();
   if (typeof Equipa !== 'undefined') Equipa.desenhar();
+  if (typeof RH !== 'undefined') RH.desenhar();
 }
 
 /* ================= Navegação ================= */
@@ -822,9 +826,11 @@ const Nuvem = {
     return !!(c.url && c.chave);
   },
 
+  arrancou() { document.body.classList.remove('a-arrancar'); },
+
   async iniciar() {
-    if (!this.configurado()) return this.ui();
-    if (!window.supabase) { this.estado = 'offline'; this.erro = 'Sem ligação à internet.'; return this.ui(); }
+    if (!this.configurado()) { this.arrancou(); return this.ui(); }
+    if (!window.supabase) { this.estado = 'offline'; this.erro = 'Sem ligação à internet.'; this.arrancou(); return this.ui(); }
     this.cliente = window.supabase.createClient(window.FROTA_NUVEM.url, window.FROTA_NUVEM.chave);
     this.cliente.auth.onAuthStateChange((evento, sessao) => {
       const antes = this.user?.id;
@@ -836,9 +842,11 @@ const Nuvem = {
       if (!this.user && antes) Equipa.sairDaEmpresa();
       this.ui(); desenharPainel();
     });
-    const { data } = await this.cliente.auth.getSession();
-    this.user = data.session?.user || null;
+    let sessao = null;
+    try { sessao = (await this.cliente.auth.getSession()).data.session; } catch (e) { /* sem rede */ }
+    this.user = sessao?.user || null;
     this.ui();
+    this.arrancou();
     if (this.user) Equipa.iniciar(this.user);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
@@ -958,7 +966,7 @@ const Nuvem = {
   ultimoEmail() { try { return localStorage.getItem(this.CH_EMAIL) || ''; } catch (e) { return ''; } },
 
   async esqueci(email) {
-    if (!email) { aviso('Escreva primeiro o seu email (em cima).'); $('#nuvemEntrar').elements.email.focus(); return; }
+    if (!email) { aviso('Escreva primeiro o seu email.'); return; }
     const { error } = await this.cliente.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
     if (error) {
       aviso(/rate|seconds|limit/i.test(error.message) ? '⏳ Já foi pedido há pouco. Espere uns minutos e tente outra vez.' : '❌ ' + error.message);
@@ -1008,6 +1016,13 @@ const Nuvem = {
 
   ui() {
     const cfg = this.configurado();
+    // Ecrã de entrada: com a internet ligada (Supabase), é preciso entrar primeiro.
+    const precisaEntrar = cfg && !this.user;
+    $('#ecraLogin').hidden = !precisaEntrar;
+    document.body.classList.toggle('bloqueado', precisaEntrar);
+    $('#loginSemRede').hidden = !(precisaEntrar && (!window.supabase || navigator.onLine === false));
+    const campoLogin = $('#loginForm').elements.email;
+    if (precisaEntrar && !campoLogin.value && document.activeElement !== campoLogin) campoLogin.value = this.ultimoEmail();
     const ultimo = this.ultimoEmail();
     $('#ultimoEmail').hidden = !ultimo || !!this.user;
     $('#ultimoEmail').innerHTML = ultimo ? `Última conta neste dispositivo: <b>${esc(ultimo)}</b>` : '';
@@ -1055,6 +1070,19 @@ $('#nuvemNovaSenha').addEventListener('submit', (e) => {
   Nuvem.guardarNovaSenha(f.senha, f.confirmar);
 });
 $('#nuvemSync').addEventListener('click', () => Nuvem.sincronizar());
+$('#loginForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  if (!Nuvem.cliente) { aviso('📶 Sem internet. Ligue-se e tente de novo.'); return; }
+  Nuvem.entrar(f.email.trim(), f.senha);
+});
+$('#loginCriar').addEventListener('click', () => {
+  const form = $('#loginForm');
+  if (!form.reportValidity()) return;
+  if (!Nuvem.cliente) { aviso('📶 Sem internet. Ligue-se e tente de novo.'); return; }
+  Nuvem.criar(form.elements.email.value.trim(), form.elements.senha.value);
+});
+$('#loginEsqueci').addEventListener('click', () => Nuvem.cliente && Nuvem.esqueci($('#loginForm').elements.email.value.trim()));
 $('#nuvemSair').addEventListener('click', () => Nuvem.sair());
 
 // (o arranque — desenhar() e Nuvem.iniciar() — está no fim de equipa.js)

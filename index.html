@@ -17,7 +17,27 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="a-arrancar">
+  <div id="ecraCarregar" class="ecra-carregar"><img src="img/logo.png" alt="Transportes Freitas"></div>
+
+  <div id="ecraLogin" class="ecra-login" hidden>
+    <div class="login-caixa">
+      <img src="img/logo.png" alt="Transportes Freitas" class="login-logo">
+      <p class="login-sub">Gestão da frota e da equipa</p>
+      <form id="loginForm">
+        <label>Email<input type="email" name="email" autocomplete="username" required autocapitalize="off"></label>
+        <label>Palavra-passe<input type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
+        <button type="submit" class="principal">Entrar</button>
+        <div class="login-links">
+          <button type="button" id="loginCriar">Criar conta</button>
+          <button type="button" id="loginEsqueci" class="link">Esqueci-me da palavra-passe</button>
+        </div>
+        <p class="ajuda">👷 É funcionário? Crie a conta com o email que deu ao RH e entra logo na empresa.</p>
+        <p class="ajuda" id="loginSemRede" hidden>📶 Sem internet. Ligue-se para entrar pela primeira vez.</p>
+      </form>
+    </div>
+  </div>
+
   <header class="topo">
     <div class="marca">
       <img src="img/logo-128.png" alt="" width="46" height="46">
@@ -91,6 +111,10 @@
         <div id="listaPainel" class="lista"></div>
       </div>
 
+      <div class="botoes espaco">
+        <button type="button" id="btnRelatorio">📄 Relatório do mês (PDF) para o contabilista</button>
+      </div>
+
       <h2>Todos os meses</h2>
       <p class="ajuda">Toque num mês para o abrir.</p>
       <div class="tabela-wrap"><table class="tabela clicavel" id="tabelaMeses"></table></div>
@@ -102,6 +126,11 @@
 
     <!-- ================= VIAGENS ================= -->
     <section id="viagens" class="aba">
+      <div class="subnav" data-subnav="viagens">
+        <button type="button" class="chip" data-sub="viagens">🚚 Viagens</button>
+        <button type="button" class="chip" data-sub="clientes">🏢 Clientes</button>
+      </div>
+      <div class="sub-painel" data-sub-painel="viagens">
       <form id="formViagens" class="formulario">
         <h2 class="tituloForm" data-novo="Nova viagem">Nova viagem</h2>
         <div class="grid2">
@@ -155,6 +184,35 @@
       <datalist id="sugLocais"></datalist>
       <h2>Viagens</h2>
       <div id="listaViagens" class="lista"></div>
+      </div>
+
+      <div class="sub-painel" data-sub-painel="clientes">
+        <h2>🏢 Clientes</h2>
+        <input type="search" id="procurarCliente" placeholder="🔍 Procurar cliente…" aria-label="Procurar cliente">
+        <div id="listaClientes" class="lista espaco"></div>
+        <div id="clientesSemFicha" class="espaco"></div>
+        <form id="formClientes" class="formulario" data-perm="clientes">
+          <h3 class="tituloForm" data-novo="Novo cliente">Novo cliente</h3>
+          <label>Nome / empresa *<input type="text" name="nome" required></label>
+          <div class="grid2">
+            <label>NIF<input type="text" name="nif" inputmode="numeric" maxlength="12"></label>
+            <label>Pessoa de contacto<input type="text" name="contacto"></label>
+          </div>
+          <div class="grid2">
+            <label>Telefone<input type="tel" name="telefone" inputmode="tel"></label>
+            <label>Email<input type="email" name="email" autocapitalize="off"></label>
+          </div>
+          <label>Morada<input type="text" name="morada"></label>
+          <div class="grid2">
+            <label>Prazo de pagamento (dias)<input type="number" name="prazo" min="0" step="1" value="30" inputmode="numeric"></label>
+            <label>Preço habitual (€/km)<input type="number" name="precoHabitual" min="0" step="0.001" inputmode="decimal"></label>
+          </div>
+          <label>Notas<input type="text" name="notas"></label>
+          <p class="ajuda">Com preço habitual, ao escolher este cliente numa viagem o preço por km é preenchido sozinho.</p>
+          <button type="submit" class="principal">Guardar cliente</button>
+          <button type="button" class="cancelar" hidden>Cancelar edição</button>
+        </form>
+      </div>
     </section>
 
     <!-- ================= ABASTECER ================= -->
@@ -251,6 +309,16 @@
           </form>
         </details>
 
+        <div class="subnav" data-subnav="equipa">
+          <button type="button" class="chip" data-sub="problemas">⚠️ Problemas</button>
+          <button type="button" class="chip" data-sub="ferias">🏖️ Férias</button>
+          <button type="button" class="chip" data-sub="escalas">📅 Escalas</button>
+          <button type="button" class="chip" data-sub="pessoas">👥 Pessoas</button>
+          <button type="button" class="chip" data-sub="salarios" data-perm="salarios">💶 Salários</button>
+          <button type="button" class="chip" data-sub="recibos">🧾 Recibos</button>
+        </div>
+
+        <div class="sub-painel" data-sub-painel="problemas">
         <h2>⚠️ Reportar problema na carrinha</h2>
         <form id="formOcorrencias" class="formulario">
           <h3 class="tituloForm" data-novo="O que se passa?">O que se passa?</h3>
@@ -286,7 +354,9 @@
           <button type="button" class="chip" data-f="todos">Todos</button>
         </div>
         <div id="listaOcorrencias" class="lista espaco"></div>
+        </div>
 
+        <div class="sub-painel" data-sub-painel="ferias">
         <h2>🏖️ Férias e folgas</h2>
         <div id="saldoFerias" class="cartoes"></div>
         <form id="formFerias" class="formulario">
@@ -315,7 +385,49 @@
 
         <h2>📅 Ausências da equipa</h2>
         <div id="listaAusencias" class="lista"></div>
+        </div>
 
+        <div class="sub-painel" data-sub-painel="escalas">
+          <h2>📅 Escalas e turnos</h2>
+          <div class="semana-nav">
+            <button type="button" class="seta" id="semAnt" aria-label="Semana anterior">◀</button>
+            <b id="semanaTitulo"></b>
+            <button type="button" class="seta" id="semSeg" aria-label="Semana seguinte">▶</button>
+            <button type="button" class="link" id="semHoje">Hoje</button>
+          </div>
+          <div class="filtros espaco" id="filtroEscalas">
+            <button type="button" class="chip ativo" data-esc="todos">Toda a equipa</button>
+            <button type="button" class="chip" data-esc="eu">Só os meus</button>
+          </div>
+          <div id="listaEscalas" class="semana espaco"></div>
+          <form id="formEscalas" class="formulario" data-perm="escalas_gerir">
+            <h3 class="tituloForm" data-novo="Marcar turno">Marcar turno</h3>
+            <div class="grid2">
+              <label>Pessoa<select name="membroId" id="selPessoaEscala" required></select></label>
+              <label>Carrinha<select name="carrinhaId" class="selCarrinha semCarrinha"></select></label>
+            </div>
+            <div class="grid3">
+              <label>Dia<input type="date" name="data" required></label>
+              <label>Início<input type="time" name="inicio" value="08:00" required></label>
+              <label>Fim<input type="time" name="fim" value="17:00" required></label>
+            </div>
+            <label>Notas (opcional)<input type="text" name="notas" placeholder="ex: carga em Vila Real às 8h"></label>
+            <div class="grid2" id="blocoRepetir">
+              <label>Repetir
+                <select name="repetir">
+                  <option value="">Só este dia</option><option value="uteis">Dias úteis até…</option>
+                  <option value="semanal">Mesmo dia da semana até…</option><option value="todos">Todos os dias até…</option>
+                </select>
+              </label>
+              <label>Até<input type="date" name="ate"></label>
+            </div>
+            <p class="ajuda">O site avisa se a pessoa estiver de férias, já tiver turno nessas horas, ou se a carrinha já estiver dada a outra pessoa.</p>
+            <button type="submit" class="principal">Guardar turno</button>
+            <button type="button" class="cancelar" hidden>Cancelar edição</button>
+          </form>
+        </div>
+
+        <div class="sub-painel" data-sub-painel="pessoas">
         <h2>👥 Pessoas</h2>
         <div id="listaPessoas" class="lista"></div>
         <form id="formPessoas" class="formulario" data-perm="pessoas_gerir">
@@ -344,8 +456,116 @@
           <div class="caixa">
             <label>Papel<select id="selPapelPermissoes"></select></label>
             <div id="listaPermissoes" class="permissoes"></div>
-            <p class="ajuda">Todas as pessoas podem sempre: pedir férias, reportar problemas, ver as carrinhas e a equipa. O Patrão pode tudo.</p>
+            <p class="ajuda">Todas as pessoas podem sempre: pedir férias, reportar problemas, ver as carrinhas, a equipa, as escalas e os seus recibos. O Patrão pode tudo.</p>
           </div>
+        </div>
+        </div>
+
+        <div class="sub-painel" data-sub-painel="salarios" data-perm="salarios">
+          <h2>💶 Salários — <span id="salMesTitulo"></span></h2>
+          <p class="ajuda">Ordenado fixo + horas extra · 14 ordenados (subsídio de férias em <b id="salMesFerias"></b> e de Natal em <b id="salMesNatal"></b>). Para outro mês, mude o mês no topo.</p>
+          <div class="cartoes" id="salCartoes"></div>
+          <div class="botoes espaco">
+            <button type="button" id="btnProcessarMes">⚙️ Preparar o mês para todos</button>
+            <button type="button" id="btnMapaPdf">🖨️ Mapa (PDF)</button>
+            <button type="button" id="btnMapaCsv">📄 Mapa (Excel)</button>
+          </div>
+          <p class="ajuda">Toque numa pessoa para lançar faltas, horas extra e adiantamentos.</p>
+          <div class="tabela-wrap espaco"><table class="tabela clicavel" id="tabelaSalarios"></table></div>
+
+          <form id="formProcessamento" class="formulario" hidden>
+            <h3 id="procTitulo"></h3>
+            <div class="grid3">
+              <label>Dias trabalhados<input type="number" name="diasTrabalhados" min="0" max="31" step="1" inputmode="numeric"></label>
+              <label>Faltas (dias)<input type="number" name="faltas" min="0" max="31" step="0.5" inputmode="decimal"></label>
+              <label>Adiantamento (€)<input type="number" name="adiantamento" min="0" step="0.01" inputmode="decimal"></label>
+            </div>
+            <div class="grid3">
+              <label>Horas extra 1.ª hora<input type="number" name="he1" min="0" step="0.5" inputmode="decimal"></label>
+              <label>Horas extra seguintes<input type="number" name="he2" min="0" step="0.5" inputmode="decimal"></label>
+              <label>Horas em descanso / feriado<input type="number" name="heDescanso" min="0" step="0.5" inputmode="decimal"></label>
+            </div>
+            <div class="grid3">
+              <label>Subsídio de férias (€)<input type="number" name="subFerias" min="0" step="0.01" inputmode="decimal"></label>
+              <label>Subsídio de Natal (€)<input type="number" name="subNatal" min="0" step="0.01" inputmode="decimal"></label>
+              <label>Outros (€, + ou −)<input type="number" name="outros" step="0.01" inputmode="decimal"></label>
+            </div>
+            <label>Notas<input type="text" name="notas" placeholder="ex: prémio de assiduidade"></label>
+            <div id="reciboPreview" class="recibo"></div>
+            <button type="submit" class="principal">Guardar</button>
+            <div class="botoes espaco">
+              <button type="button" id="procFechar">✓ Fechar mês (a pessoa passa a ver o recibo)</button>
+              <button type="button" id="procPago">💶 Marcar como pago</button>
+              <button type="button" id="procReabrir">↩ Reabrir</button>
+              <button type="button" id="procRecibo">🖨️ Recibo (PDF)</button>
+            </div>
+            <button type="button" class="cancelar" id="procCancelar">Fechar</button>
+          </form>
+
+          <h2>🗂️ Fichas das pessoas</h2>
+          <div id="listaFichas" class="lista"></div>
+          <div class="botoes espaco"><button type="button" id="btnFichasTodos">➕ Criar fichas em falta (ordenado mínimo)</button></div>
+          <form id="formFicha" class="formulario">
+            <h3 class="tituloForm" data-novo="Nova ficha">Nova ficha</h3>
+            <div class="grid2">
+              <label>Pessoa<select name="membroId" id="selPessoaFicha" required></select></label>
+              <label>Categoria<input type="text" name="categoria" list="sugCategorias" placeholder="ex: Motorista"></label>
+            </div>
+            <datalist id="sugCategorias"><option value="Motorista de ligeiros"><option value="Motorista de pesados"><option value="Mecânico"><option value="Administrativo(a)"><option value="Técnico(a) de logística"><option value="Gerente"></datalist>
+            <div class="grid3">
+              <label>Ordenado base (€)<input type="number" name="ordenadoBase" min="0" step="0.01" inputmode="decimal" required></label>
+              <label>Retenção IRS (%)<input type="number" name="taxaIrs" min="0" max="60" step="0.1" inputmode="decimal"></label>
+              <label>Sub. alimentação (€/dia)<input type="number" name="subsidioAlimentacao" min="0" step="0.01" inputmode="decimal"></label>
+            </div>
+            <div class="grid3">
+              <label>Horas por semana<input type="number" name="horasSemana" min="1" max="60" step="1" inputmode="numeric"></label>
+              <label>Contrato<select name="tipoContrato"><option>Sem termo</option><option>A termo certo</option><option>A termo incerto</option><option>Estágio</option></select></label>
+              <label>Admissão<input type="date" name="dataAdmissao"></label>
+            </div>
+            <div class="grid3">
+              <label>NIF<input type="text" name="nif" inputmode="numeric" maxlength="9"></label>
+              <label>NISS<input type="text" name="niss" inputmode="numeric" maxlength="11"></label>
+              <label>IBAN<input type="text" name="iban" autocapitalize="characters"></label>
+            </div>
+            <label>Notas<input type="text" name="notas"></label>
+            <p class="ajuda">A taxa de IRS vem das tabelas de retenção (depende do estado civil e dependentes). Com o ordenado mínimo não há retenção (0 %). Confirme com o contabilista.</p>
+            <button type="submit" class="principal">Guardar ficha</button>
+            <button type="button" class="cancelar" hidden>Cancelar edição</button>
+          </form>
+
+          <details class="caixa espaco" id="detParamSal">
+            <summary>⚙️ Taxas e regras dos salários</summary>
+            <form id="formParamSal">
+              <div class="grid2">
+                <label>Salário mínimo (€)<input type="number" name="salarioMinimo" step="0.01" inputmode="decimal"></label>
+                <label>Sub. alimentação habitual (€/dia)<input type="number" name="saPadrao" step="0.01" inputmode="decimal"></label>
+              </div>
+              <div class="grid2">
+                <label>SS empresa (%)<input type="number" name="ssEmpresa" step="0.01" inputmode="decimal"></label>
+                <label>SS trabalhador (%)<input type="number" name="ssTrabalhador" step="0.01" inputmode="decimal"></label>
+              </div>
+              <div class="grid2">
+                <label>FCT + FGCT (%)<input type="number" name="fct" step="0.001" inputmode="decimal"></label>
+                <label>Seguro acidentes trabalho (%)<input type="number" name="seguroAT" step="0.01" inputmode="decimal"></label>
+              </div>
+              <div class="grid3">
+                <label>Hora extra 1.ª (×)<input type="number" name="multHe1" step="0.005" inputmode="decimal"></label>
+                <label>Seguintes (×)<input type="number" name="multHe2" step="0.005" inputmode="decimal"></label>
+                <label>Descanso (×)<input type="number" name="multHeDescanso" step="0.005" inputmode="decimal"></label>
+              </div>
+              <div class="grid2">
+                <label>Mês do sub. de férias<select name="mesSubFerias"></select></label>
+                <label>Mês do sub. de Natal<select name="mesSubNatal"></select></label>
+              </div>
+              <p class="ajuda">Valor/hora = ordenado × 12 ÷ (52 × horas por semana). Horas extra (Código do Trabalho): +25 % na 1.ª hora, +37,5 % nas seguintes, +50 % em descanso/feriado.</p>
+            </form>
+          </details>
+        </div>
+
+        <div class="sub-painel" data-sub-painel="recibos">
+          <h2>🧾 Os meus recibos</h2>
+          <div id="minhaFicha"></div>
+          <div id="listaRecibos" class="lista espaco"></div>
         </div>
       </div>
     </section>
@@ -479,9 +699,11 @@
   </main>
 
   <div id="aviso" class="aviso" hidden></div>
+  <div id="impressao"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script src="equipa.js"></script>
+  <script src="rh.js"></script>
 </body>
 </html>
