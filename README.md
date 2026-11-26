@@ -79,3 +79,5 @@ seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
 - **Esqueci-me do PIN:** envia o email de recuperação, apaga o PIN do telemóvel e sai; ao voltar a entrar cria um PIN novo.
 - Telemóvel com sessão mas sem PIN → pede primeiro a palavra-passe e só depois deixa criar o PIN.
 - Requer a versão nova de `supabase/functions/notificar/index.ts` publicada no Supabase.
+- **Mandar alguém embora:** Equipa → Pessoas → 🗑️ → escolher "só tirar da equipa" ou "apagar também a conta".
+  Apagar a conta (pela Edge Function) remove o email/palavra-passe no Supabase e as notificações; o trabalho feito fica guardado.

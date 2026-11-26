@@ -1,5 +1,5 @@
 // Supabase Edge Function "notificar" — Transportes Freitas
-// Envia notificações para os telemóveis (Web Push) e cria as contas dos funcionários (RH).
+// Envia notificações para os telemóveis (Web Push) e cria/apaga as contas dos funcionários (RH).
 //  • Chamada pela base de dados quando há pedidos de férias, problemas nas carrinhas,
 //    recibos fechados e turnos novos (com o segredo guardado em push_config).
 //  • Chamada todos os dias às 07:30 (pg_cron) para o resumo diário.
@@ -224,6 +224,31 @@ async function criarConta(callerId: string, corpo: any) {
   return { status: 200, ok: true };
 }
 
+// O RH/Patrão tira uma pessoa da equipa e apaga a conta dela (email + palavra-passe).
+// O trabalho que a pessoa fez (viagens, recibos…) fica guardado.
+async function apagarConta(callerId: string, corpo: any) {
+  const [alvo] = await sql`select id, user_id, papel, nome from public.membros where empresa_id = ${corpo.empresa_id} and id = ${corpo.membro_id}`;
+  if (!alvo) return { status: 404, erro: 'Pessoa não encontrada.' };
+  const [eu] = await sql`select m.papel, coalesce(pp.permissoes, '{}') as permissoes from public.membros m
+    left join public.papeis_permissoes pp on pp.empresa_id = m.empresa_id and pp.papel = m.papel
+    where m.empresa_id = ${corpo.empresa_id} and m.user_id = ${callerId}`;
+  const patrao = eu?.papel === 'patrao';
+  if (!eu || !(patrao || eu.permissoes.includes('pessoas_gerir'))) return { status: 403, erro: 'Sem permissão para remover pessoas.' };
+  if (alvo.papel === 'patrao' && !patrao) return { status: 403, erro: 'Só o Patrão pode remover outro Patrão.' };
+  if (alvo.user_id === callerId) return { status: 400, erro: 'Não se pode remover a si próprio.' };
+  await sql`delete from public.membros where id = ${alvo.id}`;
+  if (!alvo.user_id) return { status: 200, ok: true, contaApagada: false };
+  await sql`delete from public.push_subscricoes where user_id = ${alvo.user_id}`;
+  // Se a pessoa ainda pertencer a outra empresa, a conta não é apagada.
+  const [outra] = await sql`select 1 from public.membros where user_id = ${alvo.user_id} limit 1`;
+  if (outra) return { status: 200, ok: true, contaApagada: false };
+  const chave = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/admin/users/${alvo.user_id}`, {
+    method: 'DELETE', headers: { apikey: chave, Authorization: `Bearer ${chave}` },
+  });
+  return { status: 200, ok: true, contaApagada: r.ok, aviso: r.ok ? undefined : 'Saiu da equipa, mas a conta não foi apagada (apague em Authentication → Users).' };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -236,6 +261,12 @@ Deno.serve(async (req) => {
       if (!uid) return json({ erro: 'Sem sessão' }, 401);
       const enviadas = await enviar([uid], { titulo: '🔔 Notificações ligadas', corpo: 'Vai receber aqui os avisos da Transportes Freitas.' });
       return json({ enviadas, ...ultimoEnvio });
+    }
+    if (corpo.acao === 'apagar_conta') {
+      const uid = await utilizador((req.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''), req.headers.get('apikey') || '');
+      if (!uid) return json({ erro: 'Sem sessão' }, 401);
+      const r = await apagarConta(uid, corpo);
+      return json(r, r.status);
     }
     if (corpo.acao === 'criar_conta') {
       const uid = await utilizador((req.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''), req.headers.get('apikey') || '');

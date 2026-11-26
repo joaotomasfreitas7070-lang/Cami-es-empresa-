@@ -496,12 +496,36 @@ const Equipa = {
     const m = this.membros.find((x) => x.id === id);
     if (!m) return;
     if (m.user_id === this.user.id) { aviso('Não se pode remover a si próprio.'); return; }
-    if (!confirm(`Remover ${m.nome} da empresa?\n\nDeixa de ter acesso logo. As viagens e registos que fez ficam guardados.`)) return;
+    if (!confirm(`Remover ${m.nome} da empresa?\n\nDeixa de ter acesso logo. As viagens, recibos e registos que fez ficam guardados.`)) return;
+    const apagar = !!m.user_id && confirm(`Também quer APAGAR A CONTA de ${m.nome} (${m.email})?\n\n` +
+      `OK = apagar a conta: o email e a palavra-passe deixam de existir e não consegue entrar de todo.\n` +
+      `Cancelar = só tirar da equipa (a conta fica, mas não vê nada da empresa).`);
+    if (apagar) {
+      const { data } = await this.cli().auth.getSession();
+      const r = await fetch(Notificacoes.url(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: window.FROTA_NUVEM.chave, Authorization: 'Bearer ' + (data.session?.access_token || '') },
+        body: JSON.stringify({ acao: 'apagar_conta', empresa_id: this.empresa.id, membro_id: id }),
+      }).catch(() => null);
+      const j = r ? await r.json().catch(() => ({})) : {};
+      if (j.ok) {
+        await this.carregarEquipa(); this.desenhar();
+        if (j.aviso) alert('⚠️ ' + j.aviso); else aviso(`🗑️ ${m.nome} foi removido e a conta apagada.`);
+        return;
+      }
+      if (j.erro && j.erro !== 'Não autorizado') { aviso('⛔ ' + j.erro); return; }
+      // Função antiga no Supabase: tira da equipa e explica como apagar a conta à mão.
+      const { error } = await this.cli().from('membros').delete().eq('id', id);
+      if (error) { aviso(erroDeRede(error) ? '❌ Precisa de internet.' : '⛔ ' + error.message); return; }
+      await this.carregarEquipa(); this.desenhar();
+      alert(`${m.nome} saiu da equipa, mas a conta não foi apagada automaticamente (falta atualizar a função no Supabase).\n\nPara a apagar: Supabase → Authentication → Users → ${m.email} → Delete user.`);
+      return;
+    }
     const { error } = await this.cli().from('membros').delete().eq('id', id);
     if (error) { aviso(erroDeRede(error) ? '❌ Precisa de internet.' : '⛔ ' + error.message); return; }
     await this.carregarEquipa();
     this.desenhar();
-    aviso(`${m.nome} foi removido.`);
+    aviso(`${m.nome} foi removido da equipa.`);
   },
   convidar(id) {
     const m = this.membros.find((x) => x.id === id);
