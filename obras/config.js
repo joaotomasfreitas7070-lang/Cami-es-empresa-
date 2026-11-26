@@ -1,10 +1,9 @@
-// Ligação à base de dados (Supabase).
-// Por defeito usa o mesmo projeto do site dos transportes (as tabelas daqui começam por "casas").
-// Para usar um projeto à parte, troque o url e a chave pública ("publishable" / "anon").
-// NUNCA coloque aqui a chave "service_role" / "secret".
+// Ligação à base de dados (Supabase) — projeto próprio das Casas das Obras
+// (separado do site dos transportes).
+// A chave aqui é a pública ("publishable"). NUNCA coloque aqui a chave "secret" / "service_role".
 window.CASAS_NUVEM = {
-  url: 'https://elrxjvqitdhovhqfdgdw.supabase.co',
-  chave: 'sb_publishable_Kk1tOx8iZoWPPIJLTGyvdw_A_UWNRl9',
-  // Nome (slug) da Edge Function dos avisos, tal como aparece no Supabase → Edge Functions
+  url: 'https://pxeykqczmjffadtmiqwt.supabase.co',
+  chave: 'sb_publishable_Win7v6dRgNAjFadJ436BFA_Mix9pDm3',
+  // Nome (slug) da Edge Function dos avisos no Supabase → Edge Functions
   funcao: 'casas-avisos',
 };

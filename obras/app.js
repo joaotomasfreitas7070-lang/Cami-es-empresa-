@@ -112,7 +112,16 @@ function ecraEntrar(msg = '') {
     <label class="campo">Palavra-passe<input type="password" name="senha" autocomplete="current-password" required></label>
     <button class="b p grande" type="submit">Entrar</button>
     <button class="b" type="button" id="esqueci">Esqueci-me da palavra-passe</button>
+    <button class="b" type="button" id="criarConta">Criar conta</button>
   </form></div>`;
+  $('#criarConta').onclick = async () => {
+    const email = $('#fEntrar [name=email]').value.trim(), senha = $('#fEntrar [name=senha]').value;
+    if (!email || senha.length < 6) return aviso('Escreva o email e uma palavra-passe (mínimo 6 caracteres) e carregue outra vez em "Criar conta".', true);
+    const { data, error } = await sb.auth.signUp({ email, password: senha, options: { emailRedirectTo: location.origin + location.pathname } });
+    if (error) return falhou(/registered|exists/i.test(error.message) ? new Error('Já existe uma conta com este email: use "Entrar".') : error);
+    if (data.session) { E.sessao = data.session; return depoisDeEntrar(); }
+    ecraEntrar('Enviámos um email para ' + email + '. Abra-o e carregue no link para confirmar a conta; depois entre aqui.');
+  };
   $('#fEntrar').onsubmit = async (ev) => {
     ev.preventDefault();
     const f = new FormData(ev.target), b = ev.target.querySelector('[type=submit]');
