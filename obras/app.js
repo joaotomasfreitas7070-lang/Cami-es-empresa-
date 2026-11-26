@@ -7,7 +7,7 @@ const NUVEM = window.CASAS_NUVEM;
 const sb = supabase.createClient(NUVEM.url, NUVEM.chave);
 const BUCKET = 'casas-fotos';
 const DIAS = ['', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo'];
-const PAISES = { PT: 'Portugal', ES: 'Espanha', 'NL/BE': 'Holanda / Bélgica', DE: 'Alemanha', FR: 'França', UK: 'Reino Unido' };
+const PAISES = { PT: 'Portugal', ES: 'Espanha', FR: 'França' };
 const ESTADOS = { bom: 'Bom', atencao: 'Precisa de atenção', mau: 'Mau' };
 
 const E = {

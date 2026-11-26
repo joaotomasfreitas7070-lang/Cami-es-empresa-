@@ -35,7 +35,7 @@ Adicionar ao ecrã principal), iOS 16.4 ou mais recente.
 ## Instalar (uma vez)
 Usa o mesmo projeto Supabase dos transportes (tabelas próprias, começadas por `casas`).
 1. Supabase → **SQL Editor** → colar `supabase/1-criar-tabelas.sql` → Run.
-2. Colar `supabase/2-casas-do-excel.sql` → Run (89 casas ativas do Excel; as riscadas ficaram de fora).
+2. Colar `supabase/2-casas-do-excel.sql` → Run (33 casas ativas de Portugal do Excel; as riscadas ficaram de fora).
 3. **Edge Functions → Deploy a new function → Via editor**, nome **`casas-avisos`**, colar
    `supabase/functions/casas-avisos/index.ts` → Deploy. Nas definições da função, **desligar "Verify JWT"**.
    Se o Supabase lhe der outro nome, ponha esse nome em `config.js` (`funcao`).
@@ -46,6 +46,6 @@ Usa o mesmo projeto Supabase dos transportes (tabelas próprias, começadas por 
 
 ## Espaço das fotos
 As fotos são reduzidas (~200 KB cada). O plano gratuito do Supabase tem 1 GB de armazenamento:
-com ~90 casas × 6 fotos por semana chega a cerca de 100 MB por semana. Por isso as fotos com mais de
+com ~33 casas × 6 fotos por semana são cerca de 40 MB por semana. Com 12 semanas guardadas (~500 MB) cabe no plano gratuito: as fotos com mais de
 **12 semanas** são apagadas sozinhas (os relatórios e respostas ficam). Mude em **Regras → Guardar as fotos durante**
 ou passe para o plano Pro (100 GB) para guardar mais tempo.
