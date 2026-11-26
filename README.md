@@ -81,3 +81,6 @@ seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
 - Requer a versão nova de `supabase/functions/notificar/index.ts` publicada no Supabase.
 - **Mandar alguém embora:** Equipa → Pessoas → 🗑️ → escolher "só tirar da equipa" ou "apagar também a conta".
   Apagar a conta (pela Edge Function) remove o email/palavra-passe no Supabase e as notificações; o trabalho feito fica guardado.
+
+## 🏠 Casas das Obras (site à parte)
+Fotos semanais das casas das obras, com regras e avisos aos encarregados: ver [`obras/README.md`](obras/README.md).
