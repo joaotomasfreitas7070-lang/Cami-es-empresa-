@@ -98,6 +98,8 @@ async function arrancar() {
   });
   const { data } = await sb.auth.getSession();
   E.sessao = data.session;
+  const conv = location.hash.match(/convite=([A-Za-z0-9]{20,})/);
+  if (conv) return ecraConvite(conv[1]);
   if (!E.sessao) return ecraEntrar();
   await depoisDeEntrar();
 }
@@ -135,6 +137,46 @@ function ecraEntrar(msg = '') {
     if (!email) return aviso('Escreva primeiro o seu email.', true);
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
     error ? falhou(error) : aviso('Enviámos um email para escolher uma palavra-passe nova.');
+  };
+}
+
+// O encarregado abriu o link pessoal: escolhe a palavra-passe e fica com conta
+async function ecraConvite(token) {
+  $('#topo').hidden = true;
+  app().innerHTML = '<p class="a-carregar">A abrir o convite…</p>';
+  const { data: info, error } = await sb.rpc('casas_convite_info', { token });
+  const limpar = () => history.replaceState(null, '', location.pathname);
+  if (error || !info) {
+    limpar();
+    return ecraEntrar('Este link já foi usado ou já não é válido. Se já criou a sua conta, entre com o seu email e palavra-passe. Se não, peça um link novo ao gestor.');
+  }
+  app().innerHTML = `
+  <div class="entrar"><form class="cartao" id="fConvite">
+    <div class="linha"><img class="logo" src="img/icon-192.png" alt=""><div><h1>Olá ${esc(info.nome.split(' ')[0])}!</h1><p class="suave">Casas das Obras</p></div></div>
+    <p>Foi convidado para enviar todas as semanas as fotos das casas das obras. Escolha a sua palavra-passe para criar a conta.</p>
+    <label class="campo">O seu email${info.email ? '' : ' (vai usá-lo para entrar)'}<input type="email" name="email" autocomplete="username" required value="${esc(info.email || '')}" ${info.email ? 'readonly' : ''}></label>
+    <label class="campo">Escolha uma palavra-passe (mínimo 6)<input type="password" name="senha" minlength="6" autocomplete="new-password" required></label>
+    <label class="campo">Repita a palavra-passe<input type="password" name="senha2" minlength="6" autocomplete="new-password" required></label>
+    <button class="b p grande" type="submit">Criar a minha conta</button>
+    <p class="suave peq">Guarde bem a palavra-passe: vai usá-la sempre para entrar.</p>
+  </form></div>`;
+  $('#fConvite').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = new FormData(ev.target), b = ev.target.querySelector('[type=submit]');
+    const email = f.get('email').trim().toLowerCase(), senha = f.get('senha');
+    if (senha !== f.get('senha2')) return aviso('As palavras-passe não são iguais.', true);
+    b.disabled = true; b.textContent = 'A criar a conta…';
+    const { data, error: e1 } = await sb.functions.invoke(NUVEM.funcao, { body: { acao: 'aceitar_convite', token, email, senha } });
+    let erro = data?.erro;
+    if (e1 && !erro) { try { erro = (await e1.context.json()).erro; } catch (e) { erro = 'Não foi possível criar a conta. Tente outra vez.'; } }
+    if (erro) { b.disabled = false; b.textContent = 'Criar a minha conta'; return aviso(erro, true); }
+    if (E.sessao) await sb.auth.signOut({ scope: 'local' });
+    const r = await sb.auth.signInWithPassword({ email: data.email || email, password: senha });
+    limpar();
+    if (r.error) return ecraEntrar('Conta criada! Entre agora com o seu email e a palavra-passe que escolheu.');
+    E.sessao = r.data.session;
+    aviso('✅ Conta criada!');
+    depoisDeEntrar();
   };
 }
 
@@ -812,25 +854,22 @@ function ecraPessoas() {
         <p class="peq">${pl(n, 'casa', 'casas')}${cu != null ? ` · ${cu}% a tempo nas últimas 8 semanas` : ''}</p>
         <div class="linha">
           <button class="b peq" type="button" data-editar="${p.id}">✏️ Editar</button>
-          ${!p.user_id && p.email ? `<button class="b peq p" type="button" data-conta="${p.id}">🔑 Criar conta</button>` : ''}
-          ${p.telefone ? `<button class="b peq" type="button" data-wa="${p.id}">💬 WhatsApp</button>` : ''}
+          ${!p.user_id && p.ativo ? `<button class="b peq p" type="button" data-link="${p.id}">🔗 Enviar link</button>` : ''}
+          ${p.user_id && (p.telefone || p.email) ? `<button class="b peq p" type="button" data-instr="${p.id}">📨 Enviar instruções</button>` : ''}
           ${p.user_id && n ? `<button class="b peq" type="button" data-lembrar="${p.id}">🔔 Lembrar</button>` : ''}
         </div></div>`;
     }).join('')}</section>`;
   $('#novaPessoa').onclick = () => editarPessoa();
   app().querySelectorAll('[data-editar]').forEach((b) => (b.onclick = () => editarPessoa(E.pessoas.find((p) => p.id === b.dataset.editar))));
-  app().querySelectorAll('[data-conta]').forEach((b) => (b.onclick = () => criarConta(E.pessoas.find((p) => p.id === b.dataset.conta))));
+  app().querySelectorAll('[data-link]').forEach((b) => (b.onclick = () => enviarLink(E.pessoas.find((p) => p.id === b.dataset.link))));
   app().querySelectorAll('[data-lembrar]').forEach((b) => (b.onclick = () => lembrar(b.dataset.lembrar)));
-  app().querySelectorAll('[data-wa]').forEach((b) => (b.onclick = () => {
-    const p = E.pessoas.find((x) => x.id === b.dataset.wa);
-    whatsapp(p.telefone, `Olá ${p.nome.split(' ')[0]}! Site das fotos das casas: ${location.origin + location.pathname}`);
-  }));
+  app().querySelectorAll('[data-instr]').forEach((b) => (b.onclick = () => enviarInstrucoes(E.pessoas.find((x) => x.id === b.dataset.instr))));
 }
 
 function editarPessoa(p = {}) {
   janela(`<form id="fPessoa"><h2>${p.id ? 'Editar pessoa' : 'Adicionar pessoa'}</h2>
     <label class="campo">Nome<input name="nome" required value="${esc(p.nome || '')}"></label>
-    <label class="campo">Email (para entrar no site)<input type="email" name="email" value="${esc(p.email || '')}" ${p.user_id ? 'readonly' : ''}></label>
+    <label class="campo">Email (opcional: se ficar vazio, a pessoa escreve o seu ao abrir o link)<input type="email" name="email" value="${esc(p.email || '')}" ${p.user_id ? 'readonly' : ''}></label>
     <label class="campo">Telemóvel (WhatsApp)<input type="tel" name="telefone" value="${esc(p.telefone || '')}" placeholder="912 345 678"></label>
     <label class="campo">Papel<select name="papel">
       <option value="encarregado" ${p.papel !== 'gestor' ? 'selected' : ''}>Encarregado — tira as fotos das suas casas</option>
@@ -851,14 +890,14 @@ function editarPessoa(p = {}) {
     }
     if (p.id) Object.assign(p, data); else E.pessoas.push(data);
     fecharJanela(); aviso('Guardado.'); render();
-    if (!p.id && data.email && confirm(`Criar já a conta de ${data.nome} com uma palavra-passe inicial?`)) criarConta(data);
+    if (!p.id && data.papel === 'encarregado') enviarLink(data);
   };
 }
 
 function criarConta(p) {
   const sugestao = 'Casa' + Math.floor(1000 + Math.random() * 9000);
   janela(`<form id="fConta"><h2>Criar conta de ${esc(p.nome)}</h2>
-    <p class="suave">Email: <b>${esc(p.email)}</b>. Depois pode enviar os dados por WhatsApp.</p>
+    <p class="suave">Email: <b>${esc(p.email)}</b>. A seguir pode enviar as instruções por WhatsApp, SMS ou email.</p>
     <label class="campo">Palavra-passe inicial<input name="senha" minlength="6" required value="${sugestao}"></label>
     <div class="linha"><button class="b p" type="submit">Criar conta</button><button class="b" type="button" data-fechar>Cancelar</button></div></form>`);
   $('#fConta').onsubmit = async (ev) => {
@@ -870,12 +909,98 @@ function criarConta(p) {
     if (erro) return aviso(erro, true);
     fecharJanela();
     await carregar(); render();
-    const txt = data.jaExistia
-      ? `Olá ${p.nome.split(' ')[0]}! Já pode entrar no site das fotos das casas com a conta ${p.email} (a mesma palavra-passe que já usa): ${location.origin + location.pathname}`
-      : `Olá ${p.nome.split(' ')[0]}! Site das fotos das casas: ${location.origin + location.pathname}\nEmail: ${p.email}\nPalavra-passe: ${senha}\nNo iPhone: abrir no Safari → Partilhar → Adicionar ao ecrã principal, e ligar os avisos.`;
     aviso(data.jaExistia ? 'Este email já tinha conta: fica ligado quando entrar.' : 'Conta criada.');
-    if (p.telefone && confirm('Enviar os dados de entrada por WhatsApp?')) whatsapp(p.telefone, txt);
-    else if (!p.telefone) { try { await navigator.clipboard.writeText(txt); aviso('Conta criada. Dados copiados — cole numa mensagem.'); } catch (e) { /* sem área de transferência */ } }
+    enviarInstrucoes(E.pessoas.find((x) => x.id === p.id) || p, data.jaExistia ? null : senha);
+  };
+}
+
+// Mensagem com o link e os passos para entrar (enviada pelo telemóvel do gestor)
+function mensagemEntrada(p, senha) {
+  const link = location.origin + location.pathname, g = E.regras;
+  return `Olá ${p.nome.split(' ')[0]}!
+A partir de agora, todas as semanas tem de enviar as fotos das casas pelas quais é responsável, neste site:
+${link}
+
+COMO ENTRAR
+1. Abra o link acima no telemóvel.
+2. Email: ${p.email}
+3. Palavra-passe: ${senha || 'a que lhe foi dada (se não souber, carregue em "Esqueci-me da palavra-passe" e siga o email que recebe)'}
+4. Carregue em "Entrar" (não em "Criar conta").
+
+PÔR NO ECRÃ DO TELEMÓVEL
+• iPhone: no Safari, carregue em Partilhar (quadrado com seta) → "Adicionar ao ecrã principal". Abra sempre pelo ícone.
+• Android: no Chrome, carregue nos 3 pontos → "Adicionar ao ecrã principal".
+Depois carregue em "Ligar avisos" para receber os lembretes.
+
+TODAS AS SEMANAS
+• Prazo: ${DIAS[g.dia_limite]} às ${horaLimite()}.
+• Em cada casa: fotos de ${g.divisoes.join(', ')} (mínimo ${g.min_fotos} fotos), responder às perguntas e carregar em "Entregar relatório".
+• Escreva qualquer problema da casa: o gestor recebe logo um aviso.
+
+Obrigado!`;
+}
+
+function mensagemConvite(p, link) {
+  const g = E.regras;
+  return `Olá ${p.nome.split(' ')[0]}!
+A partir de agora, todas as semanas tem de enviar as fotos das casas pelas quais é responsável.
+
+1. Abra este link pessoal no telemóvel (é só para si, não o partilhe):
+${link}
+2. Escolha a sua palavra-passe e carregue em "Criar a minha conta". Fica logo dentro.
+3. Ponha o site no ecrã do telemóvel:
+ • iPhone: no Safari, Partilhar (quadrado com seta) → "Adicionar ao ecrã principal".
+ • Android: no Chrome, 3 pontos → "Adicionar ao ecrã principal".
+4. Abra pelo ícone e carregue em "Ligar avisos" para receber os lembretes.
+Das próximas vezes entra com o seu email e a palavra-passe que escolheu.
+
+TODAS AS SEMANAS
+• Prazo: ${DIAS[g.dia_limite]} às ${horaLimite()}.
+• Em cada casa: fotos de ${g.divisoes.join(', ')} (mínimo ${g.min_fotos}), responder às perguntas e carregar em "Entregar relatório".
+• Escreva qualquer problema da casa: o gestor recebe logo um aviso.
+
+Obrigado!`;
+}
+
+async function enviarLink(p) {
+  let token = p.convite;
+  if (!token) {
+    const a = new Uint8Array(24); crypto.getRandomValues(a);
+    token = Array.from(a, (x) => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 56]).join('');
+    const { error } = await sb.from('casas_pessoas').update({ convite: token }).eq('id', p.id);
+    if (error) return falhou(error);
+    p.convite = token;
+  }
+  enviarInstrucoes(p, null, mensagemConvite(p, `${location.origin + location.pathname}#convite=${token}`));
+}
+
+function enviarInstrucoes(p, senha = null, texto = null) {
+  const txt = texto || mensagemEntrada(p, senha);
+  let n = String(p.telefone || '').replace(/\D/g, '');
+  if (n.length === 9) n = '351' + n;
+  const assunto = 'Casas das Obras — como entrar no site das fotos';
+  janela(`<div><div><h2>📨 Enviar instruções a ${esc(p.nome)}</h2>
+    <p class="suave">A mensagem abre já escrita na app do seu telemóvel; só tem de carregar em enviar.${texto ? ' Inclui o link pessoal: a pessoa escolhe a palavra-passe sozinha.' : ''}</p>
+    <textarea id="txtInstr" rows="10">${esc(txt)}</textarea>
+    <div class="linha">
+      ${n ? `<a class="b p" target="_blank" rel="noopener" href="https://wa.me/${n}?text=${encodeURIComponent(txt)}">💬 WhatsApp</a>
+             <a class="b" href="sms:+${n}?&body=${encodeURIComponent(txt)}">📱 SMS</a>` : ''}
+      ${p.email ? `<a class="b" href="mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(txt)}">📧 Email</a>` : ''}
+      <button class="b" type="button" id="copiarInstr">📋 Copiar</button>
+      <button class="b" type="button" data-fechar>Fechar</button>
+    </div></div></div>`);
+  // se o gestor alterar o texto, os botões usam o texto alterado
+  const atualizar = () => {
+    const t = $('#txtInstr').value;
+    $('#janelaCorpo').querySelectorAll('a.b').forEach((a) => {
+      if (a.href.startsWith('https://wa.me/')) a.href = `https://wa.me/${n}?text=${encodeURIComponent(t)}`;
+      else if (a.href.startsWith('sms:')) a.href = `sms:+${n}?&body=${encodeURIComponent(t)}`;
+      else if (a.href.startsWith('mailto:')) a.href = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(t)}`;
+    });
+  };
+  $('#txtInstr').oninput = atualizar;
+  $('#copiarInstr').onclick = async () => {
+    try { await navigator.clipboard.writeText($('#txtInstr').value); aviso('Mensagem copiada.'); } catch (e) { $('#txtInstr').select(); }
   };
 }
 

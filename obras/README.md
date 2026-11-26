@@ -40,7 +40,8 @@ Projeto Supabase próprio (organização "Casas empresa", ref `pxeykqczmjffadtmi
    `supabase/functions/casas-avisos/index.ts` → Deploy. Nas definições da função, **desligar "Verify JWT"**.
    Se o Supabase lhe der outro nome, ponha esse nome em `config.js` (`funcao`).
 4. Abrir o site → escrever email e palavra-passe → **Criar conta** → confirmar o email → Entrar: **a primeira pessoa a entrar fica gestora**.
-5. **👷 Pessoas → + Adicionar** cada encarregado (nome, email, telemóvel) → **🔑 Criar conta** → enviar por WhatsApp.
+5. **👷 Pessoas → + Adicionar** cada encarregado (nome, telemóvel, email opcional) → **🔗 Enviar link** por WhatsApp, SMS ou email.
+   Cada um abre o seu link pessoal, escolhe a palavra-passe e fica logo com conta (sem email de confirmação). O link só serve uma vez.
 6. **🏠 Casas**: marcar as casas e atribuir o encarregado de cada uma.
 7. Cada pessoa liga os avisos no seu telemóvel (botão na página inicial ou no nome, em cima à direita).
 

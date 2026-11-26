@@ -321,3 +321,15 @@ create trigger casas_relatorio_avisar after update on public.casas_relatorios
 -- De hora a hora: lembretes, fim do prazo, resumo ao gestor e limpeza das fotos antigas
 do $$ begin perform cron.unschedule('casas-de-hora-a-hora'); exception when others then null; end $$;
 select cron.schedule('casas-de-hora-a-hora', '2 * * * *', $$ select public.casas_disparar('{"evento":"hora"}'::jsonb) $$);
+
+-- ------------------------------------------------- convites por link
+-- O gestor envia a cada encarregado um link pessoal; a pessoa escolhe a palavra-passe e fica com conta.
+alter table public.casas_pessoas add column if not exists convite text unique;
+
+-- Quem abre o link (ainda sem conta) só fica a saber o nome e o email desse convite
+create or replace function public.casas_convite_info(token text) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('nome', nome, 'email', email) from casas_pessoas
+   where convite = token and length(token) >= 20 and ativo and user_id is null;
+$$;
+grant execute on function public.casas_convite_info(text) to anon, authenticated;
