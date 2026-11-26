@@ -54,10 +54,13 @@ async function equipa(empresaId: string) {
   };
 }
 
+const ultimoEnvio = { subscricoes: 0, recusadas: 0, codigos: [] as (number | string)[] };
 async function enviar(userIds: string[], msg: { titulo: string; corpo: string; tag?: string; urgente?: boolean }) {
   const ids = [...new Set(userIds.filter(Boolean))];
+  Object.assign(ultimoEnvio, { subscricoes: 0, recusadas: 0, codigos: [] });
   if (!ids.length) return 0;
   const subs = await sql`select * from public.push_subscricoes where user_id = any(${ids}::uuid[])`;
+  ultimoEnvio.subscricoes = subs.length;
   let n = 0;
   await Promise.all(subs.map(async (s: any) => {
     try {
@@ -65,6 +68,9 @@ async function enviar(userIds: string[], msg: { titulo: string; corpo: string; t
         JSON.stringify({ ...msg, url: SITE }), { TTL: 86400, urgency: msg.urgente ? 'high' : 'normal' });
       n++;
     } catch (e: any) {
+      ultimoEnvio.recusadas++;
+      ultimoEnvio.codigos.push(e?.statusCode || String(e?.message || e).slice(0, 80));
+      console.error('push recusado', e?.statusCode, e?.body);
       // Telemóvel que desligou as notificações / desinstalou: apaga a subscrição
       if (e?.statusCode === 404 || e?.statusCode === 410) await sql`delete from public.push_subscricoes where endpoint = ${s.endpoint}`;
     }
@@ -175,12 +181,13 @@ async function diario() {
 }
 
 // Quem está a pedir (para a notificação de teste)
-async function utilizador(token: string) {
+async function utilizador(token: string, chaveDoSite: string) {
   if (!token) return null;
-  const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get('SUPABASE_ANON_KEY') || '' },
-  });
-  return r.ok ? (await r.json()).id as string : null;
+  for (const apikey of [chaveDoSite, Deno.env.get('SUPABASE_ANON_KEY') || ''].filter(Boolean)) {
+    const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey } });
+    if (r.ok) return (await r.json()).id as string;
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -191,9 +198,10 @@ Deno.serve(async (req) => {
     const corpo = await req.json().catch(() => ({}));
     if (corpo.acao === 'iniciar') return json({ publica: c.publica });
     if (corpo.acao === 'teste') {
-      const uid = await utilizador((req.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''));
+      const uid = await utilizador((req.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''), req.headers.get('apikey') || '');
       if (!uid) return json({ erro: 'Sem sessão' }, 401);
-      return json({ enviadas: await enviar([uid], { titulo: '🔔 Notificações ligadas', corpo: 'Vai receber aqui os avisos da Transportes Freitas.' }) });
+      const enviadas = await enviar([uid], { titulo: '🔔 Notificações ligadas', corpo: 'Vai receber aqui os avisos da Transportes Freitas.' });
+      return json({ enviadas, ...ultimoEnvio });
     }
     if (req.headers.get('x-segredo') !== c.segredo) return json({ erro: 'Não autorizado' }, 401);
     if (corpo.evento === 'registo') return json({ enviadas: await registo(corpo) });

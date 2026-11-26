@@ -541,10 +541,7 @@ const Notificacoes = {
       const antiga = await reg.pushManager.getSubscription();
       if (antiga) await antiga.unsubscribe();
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this.chave(publica) });
-      const j = sub.toJSON();
-      const { error } = await Nuvem.cliente.from('push_subscricoes').upsert({
-        endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_id: Nuvem.user.id, empresa_id: Equipa.empresa?.id || null,
-      }, { onConflict: 'endpoint' });
+      const error = await this.registar(sub);
       if (error) throw error;
       aviso('🔔 Notificações ligadas!');
       this.teste(true);
@@ -553,14 +550,37 @@ const Notificacoes = {
     }
     this.desenhar();
   },
+  // Guarda (outra vez) este telemóvel na base de dados — não faz mal repetir.
+  async registar(sub) {
+    const j = sub.toJSON();
+    const { error } = await Nuvem.cliente.from('push_subscricoes').upsert({
+      endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_id: Nuvem.user.id, empresa_id: Equipa.empresa?.id || null,
+    }, { onConflict: 'endpoint' });
+    return error;
+  },
   async teste(silencioso) {
+    const sub = await this.subscricao().catch(() => null);
+    if (sub) {
+      const erro = await this.registar(sub);
+      if (erro && !silencioso) { alert('❌ Não foi possível registar este telemóvel na base de dados:\n' + erro.message); return; }
+    }
     const { data } = await Nuvem.cliente.auth.getSession();
     const r = await fetch(this.url(), {
       method: 'POST', body: '{"acao":"teste"}',
       headers: { 'Content-Type': 'application/json', apikey: window.FROTA_NUVEM.chave, Authorization: 'Bearer ' + (data.session?.access_token || '') },
-    }).catch(() => null);
-    const j = r ? await r.json().catch(() => ({})) : {};
-    if (!silencioso) aviso(j.enviadas ? '📨 Enviada! Deve aparecer daqui a uns segundos.' : '❌ A notificação não foi enviada.');
+    }).catch((e) => ({ falhou: e }));
+    if (silencioso) return;
+    if (!r || r.falhou) { alert('❌ Sem ligação à função das notificações.\n' + (r?.falhou?.message || '')); return; }
+    const j = await r.json().catch(() => ({}));
+    if (j.enviadas) { aviso('📨 Enviada! Deve aparecer daqui a uns segundos.'); return; }
+    let porque;
+    if (r.status === 401) porque = 'A função não reconheceu a sua sessão (' + (j.erro || 'Sem sessão') + ').';
+    else if (r.status === 404) porque = 'A função não foi encontrada (endereço "' + (window.FROTA_NUVEM?.funcao || 'notificar') + '").';
+    else if (j.erro) porque = 'Erro na função: ' + j.erro;
+    else if (j.subscricoes === 0) porque = 'Este telemóvel não está registado na base de dados.';
+    else if (j.recusadas) porque = 'O serviço de notificações do telemóvel recusou (código ' + (j.codigos || []).join(', ') + ').';
+    else porque = 'Resposta da função: ' + r.status + ' ' + JSON.stringify(j);
+    alert('❌ A notificação não foi enviada.\n\n' + porque + '\n\nMande uma captura deste ecrã ao Claude.');
   },
   async desligar() {
     const sub = await this.subscricao();
