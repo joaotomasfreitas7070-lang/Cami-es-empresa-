@@ -231,6 +231,32 @@ async function criarConta(corpo: any) {
   return { status: 200, ok: true };
 }
 
+// O encarregado abriu o link do convite e escolheu a palavra-passe: cria a conta já confirmada
+async function aceitarConvite(corpo: any) {
+  const token = String(corpo.token || '');
+  const senha = String(corpo.senha || '');
+  if (token.length < 20) return { status: 400, erro: 'Link inválido.' };
+  const [p] = await sql`select id, nome, email, user_id, ativo from public.casas_pessoas where convite = ${token}`;
+  if (!p || !p.ativo || p.user_id) return { status: 404, erro: 'Este link já foi usado ou já não é válido. Peça um novo ao gestor, ou entre com o seu email e palavra-passe.' };
+  const email = String(p.email || corpo.email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { status: 400, erro: 'Escreva um email válido.' };
+  if (senha.length < 6) return { status: 400, erro: 'A palavra-passe tem de ter pelo menos 6 caracteres.' };
+  const [outra] = await sql`select 1 from public.casas_pessoas where lower(email) = ${email} and id <> ${p.id}`;
+  if (outra) return { status: 409, erro: 'Este email já está a ser usado por outra pessoa.' };
+  const r = await fetch(`${URL_SB}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { apikey: SERVICO, Authorization: `Bearer ${SERVICO}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: senha, email_confirm: true, user_metadata: { nome: p.nome } }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const m = String(j.msg || j.message || j.error_description || j.error || r.status);
+    return { status: 409, erro: /already|registered|exists/i.test(m) ? 'Já existe uma conta com este email: volte ao início e carregue em "Entrar".' : 'Não foi possível criar a conta: ' + m };
+  }
+  await sql`update public.casas_pessoas set user_id = ${j.id}, email = ${email}, convite = null where id = ${p.id}`;
+  return { status: 200, ok: true, email };
+}
+
 async function lembrarAgora(pessoaId: string) {
   const t = agoraPT();
   const p = [...(await pendentes(t.segunda)).entries()].find(([id]) => id === pessoaId)?.[1];
@@ -248,6 +274,7 @@ Deno.serve(async (req) => {
     const corpo = await req.json().catch(() => ({}));
     const c = await configurar(corpo.acao === 'iniciar' ? corpo.funcao : undefined);
     if (corpo.acao === 'iniciar') return json({ publica: c.publica });
+    if (corpo.acao === 'aceitar_convite') { const r = await aceitarConvite(corpo); return json(r, r.status); }
     if (corpo.acao) {
       const uid = await utilizador(req);
       if (!uid) return json({ erro: 'Sem sessão' }, 401);
