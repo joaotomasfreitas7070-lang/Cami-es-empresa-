@@ -491,7 +491,7 @@ const Relatorios = {
 
 /* ===================== NOTIFICAÇÕES ===================== */
 const Notificacoes = {
-  url() { return (window.FROTA_NUVEM?.url || '') + '/functions/v1/notificar'; },
+  url() { return (window.FROTA_NUVEM?.url || '') + '/functions/v1/' + (window.FROTA_NUVEM?.funcao || 'notificar'); },
   suportado() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; },
   iphoneSemIcone() {
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
