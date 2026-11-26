@@ -839,6 +839,7 @@ const Nuvem = {
       if (this.user?.email) { try { localStorage.setItem(this.CH_EMAIL, this.user.email); } catch (e) { /* */ } }
       if (this.recuperacao && this.user) setTimeout(() => this.mostrarNovaSenha(true), 200);
       if (this.user && this.user.id !== antes) setTimeout(() => Equipa.iniciar(this.user), 0);
+      if (this.user && !antes && evento === 'SIGNED_IN') setTimeout(() => Bloqueio.depoisDeEntrar(), 0);
       if (!this.user && antes) Equipa.sairDaEmpresa();
       this.ui(); desenharPainel();
     });
@@ -996,16 +997,18 @@ const Nuvem = {
 
   async guardarNovaSenha(nova, confirmar) {
     if (nova !== confirmar) { aviso('❌ As duas palavras-passe não são iguais.'); return; }
-    const { error } = await this.cliente.auth.updateUser({ password: nova });
+    const { data: dadosNovos, error } = await this.cliente.auth.updateUser({ password: nova, data: { trocar_senha: false } });
     if (error) {
       aviso(/different|same/i.test(error.message) ? '❌ Tem de ser diferente da anterior.' : /session|auth/i.test(error.message)
         ? '❌ O link expirou. Peça outro em "Esqueci-me da palavra-passe".' : '❌ ' + error.message);
       return;
     }
     this.recuperacao = false;
+    if (dadosNovos?.user) this.user = dadosNovos.user;
     $('#nuvemNovaSenha').reset(); $('#nuvemNovaSenha').hidden = true;
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     alert('✅ Palavra-passe alterada! Use a nova palavra-passe da próxima vez que entrar (também no ícone do ecrã principal).');
+    if (typeof Bloqueio !== 'undefined') Bloqueio.depoisDeEntrar(); // sem PIN (ex: esqueceu-se) → cria um novo
   },
 
   async sair() {

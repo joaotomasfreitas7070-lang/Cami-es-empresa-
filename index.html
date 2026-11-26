@@ -31,10 +31,25 @@
         <div id="bloqSenhaBloco" hidden>
           <label>Palavra-passe<input type="password" name="senha" autocomplete="current-password"></label>
         </div>
-        <button type="submit" class="principal">Desbloquear</button>
+        <div id="bloqCriarPinBloco" hidden>
+          <p class="ajuda">Crie o seu PIN de 4 a 6 números. Vai usá-lo sempre que abrir a app.</p>
+          <label>Novo PIN<input type="password" name="pinNovo" class="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></label>
+          <label>Repita o PIN<input type="password" name="pinNovo2" class="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></label>
+        </div>
+        <div id="bloqNovaSenhaBloco" hidden>
+          <p class="ajuda">É a sua primeira entrada: escolha a <b>sua</b> palavra-passe (a que recebeu do RH deixa de funcionar).</p>
+          <label>Nova palavra-passe<input type="password" name="senhaNova" autocomplete="new-password" minlength="6"></label>
+          <label>Repita a palavra-passe<input type="password" name="senhaNova2" autocomplete="new-password" minlength="6"></label>
+        </div>
+        <div id="bloqFaceIdOferta" hidden>
+          <p class="ajuda">✅ PIN guardado! Quer abrir a app também com o <b>Face ID / impressão digital</b>?</p>
+          <button type="button" id="bloqAtivarFaceId" class="principal">🙂 Sim, ativar Face ID</button>
+          <button type="button" id="bloqSemFaceId" class="biometria">Agora não</button>
+        </div>
+        <button type="submit" class="principal" id="bloqSubmeter">Desbloquear</button>
         <button type="button" id="bloqFaceId" class="biometria" hidden>🔓 Usar Face ID / impressão digital</button>
         <div class="login-links">
-          <button type="button" class="link" id="bloqUsarSenha">Usar a palavra-passe</button>
+          <button type="button" class="link" id="bloqEsqueci">Esqueci-me do PIN</button>
           <button type="button" class="link" id="bloqSair">Sair da conta</button>
         </div>
         <p class="ajuda" id="bloqInfo"></p>
@@ -468,6 +483,11 @@
             <label>Data de entrada<input type="date" name="data_entrada"></label>
           </div>
           <label>Contacto de emergência (opcional)<input type="text" name="contacto_emergencia" placeholder="ex: Maria (mãe) 913 000 000"></label>
+          <div id="blocoSenhaInicial">
+            <label>Palavra-passe inicial (para a 1.ª entrada)<input type="text" name="senha_inicial" minlength="6" autocomplete="off" autocapitalize="off" placeholder="mínimo 6 caracteres"></label>
+            <p class="ajuda">🔑 Com palavra-passe, a conta fica criada já: dê à pessoa o <b>email</b> e esta <b>palavra-passe</b>.
+              Na primeira entrada ela escolhe a sua própria palavra-passe e cria o PIN. Sem palavra-passe, envie o convite 📤 e ela cria a conta.</p>
+          </div>
           <p class="ajuda">* Obrigatório. O RH e o Marketing são avisados do aniversário um dia antes.</p>
           <button type="submit" class="principal">Guardar pessoa</button>
           <button type="button" class="cancelar" hidden>Cancelar edição</button>
@@ -668,7 +688,8 @@
       <div id="blocoSeguranca" hidden>
         <h2>🔒 Segurança</h2>
         <div class="caixa">
-          <p>Ao abrir a app, e quando volta a ela depois de algum tempo, é pedido o <b>Face ID</b>, o <b>PIN</b> ou a <b>palavra-passe</b>.</p>
+          <p>Ao abrir a app, e quando volta a ela depois de algum tempo, é pedido o <b>PIN</b> (obrigatório) ou o <b>Face ID</b>.
+            Se se esquecer do PIN, toque em "Esqueci-me do PIN" e recebe um email para recuperar o acesso.</p>
           <p class="ajuda" id="segEstado"></p>
           <form id="formPin" class="espaco" hidden>
             <div class="grid2">
@@ -686,7 +707,6 @@
             <select id="segMinutos"><option value="1">1 minuto</option><option value="5">5 minutos</option><option value="15">15 minutos</option><option value="60">1 hora</option></select>
           </label>
           <div class="botoes espaco">
-            <button type="button" id="segRemoverPin" class="link" hidden>Remover PIN</button>
             <button type="button" id="segRemoverFaceId" class="link" hidden>Desligar Face ID</button>
           </div>
         </div>

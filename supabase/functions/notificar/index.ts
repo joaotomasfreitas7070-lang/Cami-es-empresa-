@@ -1,5 +1,5 @@
 // Supabase Edge Function "notificar" — Transportes Freitas
-// Envia notificações para os telemóveis (Web Push).
+// Envia notificações para os telemóveis (Web Push) e cria as contas dos funcionários (RH).
 //  • Chamada pela base de dados quando há pedidos de férias, problemas nas carrinhas,
 //    recibos fechados e turnos novos (com o segredo guardado em push_config).
 //  • Chamada todos os dias às 07:30 (pg_cron) para o resumo diário.
@@ -190,6 +190,40 @@ async function utilizador(token: string, chaveDoSite: string) {
   return null;
 }
 
+// O RH/Patrão cria a conta de um funcionário com o email e uma palavra-passe inicial.
+// Só funciona para pessoas já adicionadas na empresa, e só por quem tem a permissão "pessoas_gerir".
+async function criarConta(callerId: string, corpo: any) {
+  const email = String(corpo.email || '').trim().toLowerCase();
+  const senha = String(corpo.senha || '');
+  if (!email || senha.length < 6) return { status: 400, erro: 'Email e palavra-passe (mínimo 6 caracteres) são obrigatórios.' };
+  const [alvo] = await sql`select empresa_id, papel, nome, user_id from public.membros where empresa_id = ${corpo.empresa_id} and email = ${email}`;
+  if (!alvo) return { status: 404, erro: 'Adicione primeiro a pessoa na lista da equipa.' };
+  const [eu] = await sql`select m.papel, coalesce(pp.permissoes, '{}') as permissoes from public.membros m
+    left join public.papeis_permissoes pp on pp.empresa_id = m.empresa_id and pp.papel = m.papel
+    where m.empresa_id = ${corpo.empresa_id} and m.user_id = ${callerId}`;
+  const patrao = eu?.papel === 'patrao';
+  if (!eu || !(patrao || eu.permissoes.includes('pessoas_gerir'))) return { status: 403, erro: 'Sem permissão para criar contas.' };
+  if (alvo.papel === 'patrao' && !patrao) return { status: 403, erro: 'Só o Patrão pode criar a conta de outro Patrão.' };
+  if (alvo.user_id) return { status: 409, erro: 'Esta pessoa já tem conta. Se se esqueceu da palavra-passe, use "Esqueci-me da palavra-passe".' };
+  const chave = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { apikey: chave, Authorization: `Bearer ${chave}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: senha, email_confirm: true, user_metadata: { nome: alvo.nome, trocar_senha: true } }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = String(j.msg || j.message || j.error_description || j.error || r.status);
+    return { status: 409, erro: /already|registered|exists/i.test(msg) ? 'Já existe uma conta com este email. A pessoa pode entrar com a palavra-passe dela (ou "Esqueci-me da palavra-passe").' : 'Não foi possível criar a conta: ' + msg };
+  }
+  // Liga já a conta à pessoa da equipa
+  await sql.begin(async (t: any) => {
+    await t`select set_config('app.sistema', '1', true)`;
+    await t`update public.membros set user_id = ${j.id} where empresa_id = ${corpo.empresa_id} and email = ${email} and user_id is null`;
+  });
+  return { status: 200, ok: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -202,6 +236,12 @@ Deno.serve(async (req) => {
       if (!uid) return json({ erro: 'Sem sessão' }, 401);
       const enviadas = await enviar([uid], { titulo: '🔔 Notificações ligadas', corpo: 'Vai receber aqui os avisos da Transportes Freitas.' });
       return json({ enviadas, ...ultimoEnvio });
+    }
+    if (corpo.acao === 'criar_conta') {
+      const uid = await utilizador((req.headers.get('authorization') || '').replace(/^Bearer\s+/i, ''), req.headers.get('apikey') || '');
+      if (!uid) return json({ erro: 'Sem sessão' }, 401);
+      const r = await criarConta(uid, corpo);
+      return json(r, r.status);
     }
     if (req.headers.get('x-segredo') !== c.segredo) return json({ erro: 'Não autorizado' }, 401);
     if (corpo.evento === 'registo') return json({ enviadas: await registo(corpo) });

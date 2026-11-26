@@ -70,3 +70,12 @@ seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
 - **Folha de salários** (Equipa → Salários): todas as colunas do mapa (tempo, abonos, descontos, sub. alimentação,
   a receber, SS empresa, FCT, seguro AT, custo), edição direta nos rascunhos, fechar/pagar todos, e **resumo do ano**
   mês a mês por pessoa (a receber / bruto / custo) com subsídios de férias e Natal.
+
+## 👤 Contas criadas pelo RH e PIN obrigatório
+- Ao adicionar uma pessoa, o RH/Patrão pode pôr uma **palavra-passe inicial**: a conta é criada logo pela Edge Function
+  (só para pessoas já na equipa e só por quem tem "pessoas_gerir"), e pode enviar os dados por WhatsApp.
+- **1.ª entrada:** a pessoa escolhe a sua palavra-passe (a do RH deixa de funcionar) e cria o **PIN obrigatório**;
+  pode ativar o Face ID. Depois disso a app abre sempre com PIN/Face ID.
+- **Esqueci-me do PIN:** envia o email de recuperação, apaga o PIN do telemóvel e sai; ao voltar a entrar cria um PIN novo.
+- Telemóvel com sessão mas sem PIN → pede primeiro a palavra-passe e só depois deixa criar o PIN.
+- Requer a versão nova de `supabase/functions/notificar/index.ts` publicada no Supabase.

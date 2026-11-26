@@ -446,8 +446,32 @@ const Equipa = {
     }
     await this.carregarEquipa();
     this.desenhar();
-    aviso(editId ? '✅ Pessoa atualizada' : `✅ ${registo.nome} adicionado. Envie-lhe o convite (📤).`);
+    const senha = (f.senha_inicial || '').trim();
+    const membro = this.membros.find((m) => m.email === registo.email);
+    if (senha && membro && !membro.user_id) await this.criarConta(membro, senha);
+    else aviso(editId ? '✅ Pessoa atualizada' : `✅ ${registo.nome} adicionado. Envie-lhe o convite (📤).`);
     return true;
+  },
+  async criarConta(m, senha) {
+    if (senha.length < 6) { alert('A palavra-passe inicial tem de ter pelo menos 6 caracteres. A pessoa ficou adicionada; envie-lhe o convite 📤.'); return; }
+    const { data } = await this.cli().auth.getSession();
+    const r = await fetch(Notificacoes.url(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: window.FROTA_NUVEM.chave, Authorization: 'Bearer ' + (data.session?.access_token || '') },
+      body: JSON.stringify({ acao: 'criar_conta', empresa_id: this.empresa.id, email: m.email, senha }),
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !j.ok) {
+      alert(`⚠️ ${m.nome} foi adicionado, mas a conta não foi criada automaticamente.\n\n${j.erro && j.erro !== 'Não autorizado' ? j.erro : 'Falta atualizar a função no Supabase (código novo).'}\n\nEnquanto isso, envie o convite 📤 para a pessoa criar a conta.`);
+      return;
+    }
+    await this.carregarEquipa(); this.desenhar();
+    const texto = `Olá ${m.nome.split(' ')[0]}! O teu acesso à ${this.empresa.nome}:\n\n📱 ${location.origin + location.pathname}\n✉️ Email: ${m.email}\n🔑 Palavra-passe: ${senha}\n\n` +
+      `Na primeira entrada vais escolher a tua palavra-passe e criar o teu PIN. Dica: adiciona o site ao ecrã principal.`;
+    if (confirm(`✅ Conta criada!\n\nEmail: ${m.email}\nPalavra-passe: ${senha}\n\nQuer enviar estes dados à pessoa (WhatsApp, SMS…)?`)) {
+      if (navigator.share) navigator.share({ text: texto }).catch(() => {});
+      else window.open('https://wa.me/' + (m.telefone ? telWhatsApp(m.telefone) : '') + '?text=' + encodeURIComponent(texto), '_blank');
+    }
   },
   perfilCompleto(m = this.eu) { return !!(m?.telefone && m?.data_nascimento); },
   async guardarMeuPerfil(f) {
@@ -867,9 +891,9 @@ $('#formPessoas').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   const ok = await Equipa.guardarPessoa(Object.fromEntries(new FormData(form)), form.dataset.editId);
-  if (ok) { sairEdicao(form); form.elements.dias_ferias.value = 22; }
+  if (ok) { sairEdicao(form); form.elements.dias_ferias.value = 22; $('#blocoSenhaInicial').hidden = false; }
 });
-$('#formPessoas .cancelar').addEventListener('click', () => { sairEdicao($('#formPessoas')); $('#formPessoas').elements.dias_ferias.value = 22; });
+$('#formPessoas .cancelar').addEventListener('click', () => { sairEdicao($('#formPessoas')); $('#formPessoas').elements.dias_ferias.value = 22; $('#blocoSenhaInicial').hidden = false; });
 
 $('#formCriarEmpresa').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -922,6 +946,7 @@ document.addEventListener('click', (e) => {
     if (!m) return;
     ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada', 'data_nascimento', 'contacto_emergencia'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
     form.dataset.editId = m.id;
+    $('#blocoSenhaInicial').hidden = !!m.user_id;
     form.querySelector('.tituloForm').textContent = '✏️ A editar ' + m.nome;
     form.querySelector('.cancelar').hidden = false;
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });

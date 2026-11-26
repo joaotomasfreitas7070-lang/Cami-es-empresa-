@@ -701,26 +701,76 @@ const Bloqueio = {
     $('#ecraBloqueio').hidden = false;
     $('#bloqOla').textContent = `Olá, ${(Equipa.eu?.nome || Nuvem.user.email || '').split(/[\s@]/)[0]}! 🔒`;
     $('#bloqFaceId').hidden = !this.temFaceId();
-    $('#bloqInfo').textContent = this.temPin() || this.temFaceId() ? '' : 'Dica: depois de entrar, crie um PIN em Mais → Segurança (funciona sem internet).';
+    $('#bloqInfo').textContent = this.temPin() ? '' : 'Por segurança, confirme a sua palavra-passe. A seguir vai criar o PIN.';
     this.modo(this.temPin() ? 'pin' : 'senha');
   },
   modo(m) {
     const f = $('#bloqForm');
-    $('#bloqPinBloco').hidden = m !== 'pin';
-    $('#bloqSenhaBloco').hidden = m !== 'senha';
-    f.elements.pin.required = m === 'pin';
-    f.elements.senha.required = m === 'senha';
-    $('#bloqUsarSenha').textContent = m === 'pin' ? 'Usar a palavra-passe' : 'Usar o PIN';
-    $('#bloqUsarSenha').hidden = m === 'senha' && !this.temPin();
+    const blocos = { pin: '#bloqPinBloco', senha: '#bloqSenhaBloco', 'criar-pin': '#bloqCriarPinBloco', 'nova-senha': '#bloqNovaSenhaBloco', 'faceid-oferta': '#bloqFaceIdOferta' };
+    Object.entries(blocos).forEach(([k, sel]) => { $(sel).hidden = k !== m; });
+    ['pin', 'senha', 'pinNovo', 'pinNovo2', 'senhaNova', 'senhaNova2'].forEach((n) => { f.elements[n].required = false; });
+    ({ pin: ['pin'], senha: ['senha'], 'criar-pin': ['pinNovo', 'pinNovo2'], 'nova-senha': ['senhaNova', 'senhaNova2'] }[m] || []).forEach((n) => { f.elements[n].required = true; });
+    $('#bloqSubmeter').hidden = m === 'faceid-oferta';
+    $('#bloqSubmeter').textContent = { pin: 'Desbloquear', senha: 'Entrar', 'criar-pin': 'Guardar PIN', 'nova-senha': 'Guardar palavra-passe' }[m] || 'Continuar';
+    $('#bloqEsqueci').hidden = !['pin', 'senha'].includes(m);
+    $('#bloqEsqueci').textContent = m === 'pin' ? 'Esqueci-me do PIN' : 'Esqueci-me da palavra-passe';
+    $('#bloqFaceId').hidden = m !== 'pin' || !this.temFaceId();
     this.modoAtual = m;
-    setTimeout(() => (m === 'pin' ? f.elements.pin : f.elements.senha).focus(), 50);
+    const foco = { pin: 'pin', senha: 'senha', 'criar-pin': 'pinNovo', 'nova-senha': 'senhaNova' }[m];
+    if (foco) setTimeout(() => f.elements[foco].focus(), 50);
   },
-  abrir() {
-    this.trancada = false;
+  // Depois de provar quem é: passos obrigatórios (trocar a palavra-passe dada pelo RH, criar o PIN).
+  async abrir() {
     this.gravar('falhas', 0);
+    $('#bloqForm').reset();
+    $('#bloqInfo').textContent = '';
+    if (Nuvem.user?.user_metadata?.trocar_senha) { this.mostrarPasso('nova-senha', 'Bem-vindo(a)! 👋'); return; }
+    if (!this.temPin()) { this.mostrarPasso('criar-pin', 'Crie o seu PIN 🔢'); return; }
+    this.trancada = false;
     document.body.classList.remove('trancado');
     $('#ecraBloqueio').hidden = true;
+  },
+  mostrarPasso(m, titulo) {
+    this.trancada = true;
+    document.body.classList.add('trancado');
+    $('#ecraBloqueio').hidden = false;
+    $('#bloqOla').textContent = titulo;
+    this.modo(m);
+  },
+  // Chamado quando a pessoa acaba de entrar com o email e a palavra-passe.
+  depoisDeEntrar() {
+    if (!Nuvem.user || Nuvem.recuperacao || (this.trancada && ['pin', 'senha'].includes(this.modoAtual))) return;
+    this.abrir();
+  },
+  async guardarPin(pin, pin2) {
+    if (!/^\d{4,6}$/.test(pin)) { $('#bloqInfo').textContent = '❌ O PIN tem de ter 4 a 6 números.'; return; }
+    if (pin !== pin2) { $('#bloqInfo').textContent = '❌ Os dois PIN não são iguais.'; return; }
+    const sal = b64url(crypto.getRandomValues(new Uint8Array(16)));
+    this.gravar('pin', { sal, hash: await this.hash(pin, sal), tamanho: pin.length });
     $('#bloqForm').reset();
+    this.desenhar();
+    if (!this.temFaceId() && await this.faceIdDisponivel()) { this.mostrarPasso('faceid-oferta', 'PIN criado 🔢'); return; }
+    this.abrir();
+    aviso('🔢 PIN criado. Vai pedi-lo sempre que abrir a app.');
+  },
+  async guardarNovaSenha(s1, s2) {
+    if (s1.length < 6) { $('#bloqInfo').textContent = '❌ Mínimo 6 caracteres.'; return; }
+    if (s1 !== s2) { $('#bloqInfo').textContent = '❌ As duas palavras-passe não são iguais.'; return; }
+    const { data, error } = await Nuvem.cliente.auth.updateUser({ password: s1, data: { trocar_senha: false } });
+    if (error) { $('#bloqInfo').textContent = '❌ ' + (/different|same/i.test(error.message) ? 'Tem de ser diferente da palavra-passe que recebeu.' : error.message); return; }
+    if (data?.user) Nuvem.user = data.user; else if (Nuvem.user.user_metadata) Nuvem.user.user_metadata.trocar_senha = false;
+    aviso('✅ Palavra-passe guardada');
+    this.abrir();
+  },
+  async esqueci() {
+    const email = Nuvem.user?.email;
+    if (!email) return;
+    if (this.modoAtual === 'pin') {
+      if (!confirm(`Esqueceu-se do PIN?\n\nVamos enviar um email para ${email} para recuperar o acesso. Depois de entrar, cria um PIN novo.`)) return;
+      await Nuvem.esqueci(email);
+      this.gravar('pin', null); this.gravar('faceid', null); this.gravar('falhas', 0);
+      await this.sairConta();
+    } else await Nuvem.esqueci(email);
   },
   async tentarPin(pin) {
     const p = this.ler('pin');
@@ -740,11 +790,14 @@ const Bloqueio = {
     if (!navigator.onLine) { $('#bloqInfo').textContent = '📶 Sem internet: use o PIN ou o Face ID.'; return; }
     const { error } = await Nuvem.cliente.auth.signInWithPassword({ email: Nuvem.user.email, password: senha });
     if (error) { $('#bloqInfo').textContent = /invalid/i.test(error.message) ? '❌ Palavra-passe errada.' : '❌ ' + error.message; return; }
+    const { data } = await Nuvem.cliente.auth.getUser().catch(() => ({ data: {} }));
+    if (data?.user) Nuvem.user = data.user;
     this.abrir();
-    if (!this.temPin()) aviso('💡 Crie um PIN em Mais → Segurança para abrir mais depressa.');
   },
   async sairConta() {
-    this.abrir();
+    this.trancada = false;
+    document.body.classList.remove('trancado');
+    $('#ecraBloqueio').hidden = true;
     await Nuvem.cliente.auth.signOut();
   },
 
@@ -787,7 +840,6 @@ const Bloqueio = {
     $('#segEstado').innerHTML = `PIN: <b>${pin ? '✓ criado' : 'não criado'}</b> · Face ID / impressão digital: <b>${face ? '✓ ligado' : pode ? 'desligado' : 'não disponível neste aparelho'}</b>`;
     $('#segPin').textContent = pin ? '🔢 Mudar PIN' : '🔢 Criar PIN';
     $('#segFaceId').hidden = face || !pode;
-    $('#segRemoverPin').hidden = !pin;
     $('#segRemoverFaceId').hidden = !face;
     if (document.activeElement !== $('#segMinutos')) $('#segMinutos').value = String(this.minutos());
   },
@@ -796,13 +848,19 @@ const Bloqueio = {
 $('#bloqForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const f = e.target.elements;
-  if (Bloqueio.modoAtual === 'pin') Bloqueio.tentarPin(f.pin.value.trim()); else Bloqueio.tentarSenha(f.senha.value);
+  const m = Bloqueio.modoAtual;
+  if (m === 'pin') Bloqueio.tentarPin(f.pin.value.trim());
+  else if (m === 'senha') Bloqueio.tentarSenha(f.senha.value);
+  else if (m === 'criar-pin') Bloqueio.guardarPin(f.pinNovo.value.trim(), f.pinNovo2.value.trim());
+  else if (m === 'nova-senha') Bloqueio.guardarNovaSenha(f.senhaNova.value, f.senhaNova2.value);
 });
+$('#bloqAtivarFaceId').addEventListener('click', async () => { await Bloqueio.ativarFaceId(); Bloqueio.abrir(); });
+$('#bloqSemFaceId').addEventListener('click', () => { Bloqueio.abrir(); aviso('Pode ativar o Face ID quando quiser em Mais → Segurança.'); });
 $('#bloqForm').elements.pin.addEventListener('input', (e) => {
   const p = Bloqueio.ler('pin');
   if (p && e.target.value.length === p.tamanho) Bloqueio.tentarPin(e.target.value); // entra sozinho ao escrever o último número
 });
-$('#bloqUsarSenha').addEventListener('click', () => Bloqueio.modo(Bloqueio.modoAtual === 'pin' ? 'senha' : 'pin'));
+$('#bloqEsqueci').addEventListener('click', () => Bloqueio.esqueci());
 $('#bloqFaceId').addEventListener('click', () => Bloqueio.usarFaceId());
 $('#bloqSair').addEventListener('click', () => { if (confirm('Sair da conta neste telemóvel?')) Bloqueio.sairConta(); });
 $('#segPin').addEventListener('click', () => { $('#formPin').hidden = false; $('#formPin').elements.pin.focus(); });
@@ -818,7 +876,6 @@ $('#formPin').addEventListener('submit', async (e) => {
   Bloqueio.desenhar();
 });
 $('#segFaceId').addEventListener('click', () => Bloqueio.ativarFaceId());
-$('#segRemoverPin').addEventListener('click', () => { if (confirm('Remover o PIN deste telemóvel?')) { Bloqueio.gravar('pin', null); Bloqueio.desenhar(); } });
 $('#segRemoverFaceId').addEventListener('click', () => { Bloqueio.gravar('faceid', null); Bloqueio.desenhar(); });
 $('#segBloquear').addEventListener('click', () => Bloqueio.trancar());
 $('#segMinutos').addEventListener('change', (e) => { try { localStorage.setItem('frota-bloq-min', e.target.value); } catch (er) { /* */ } aviso('✅ Guardado'); });
