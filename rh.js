@@ -489,10 +489,98 @@ const Relatorios = {
   },
 };
 
+/* ===================== NOTIFICAÇÕES ===================== */
+const Notificacoes = {
+  url() { return (window.FROTA_NUVEM?.url || '') + '/functions/v1/notificar'; },
+  suportado() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; },
+  iphoneSemIcone() {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const instalado = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    return ios && !instalado;
+  },
+  chave(b64) {
+    const p = '='.repeat((4 - (b64.length % 4)) % 4), s = atob((b64 + p).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...s].map((c) => c.charCodeAt(0)));
+  },
+  async subscricao() {
+    if (!this.suportado()) return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg ? reg.pushManager.getSubscription() : null;
+  },
+  async desenhar() {
+    const bloco = $('#blocoNotif');
+    bloco.hidden = !Nuvem.user;
+    if (bloco.hidden) return;
+    let txt, ligado = false;
+    if (this.iphoneSemIcone()) txt = '📱 Para ativar no iPhone, adicione primeiro o site ao ecrã principal (Partilhar → Adicionar ao ecrã principal) e abra-o pelo ícone.';
+    else if (!this.suportado()) txt = '⚠️ Este navegador não suporta notificações.';
+    else if (Notification.permission === 'denied') txt = '🔕 As notificações estão bloqueadas nas definições do telemóvel para este site.';
+    else {
+      const sub = await this.subscricao().catch(() => null);
+      ligado = !!sub && Notification.permission === 'granted';
+      txt = ligado ? '✅ Notificações ligadas neste telemóvel.' : '🔕 Ainda não estão ligadas neste telemóvel.';
+    }
+    $('#notifEstado').textContent = txt;
+    $('#notifAtivar').hidden = ligado || this.iphoneSemIcone() || !this.suportado();
+    $('#notifTeste').hidden = !ligado;
+    $('#notifDesligar').hidden = !ligado;
+  },
+  async ativar() {
+    if (!this.suportado()) { aviso('Este navegador não suporta notificações.'); return; }
+    // Pedir autorização logo no toque (o iPhone só deixa assim)
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { aviso('🔕 Sem autorização para notificações.'); this.desenhar(); return; }
+    try {
+      let { data: publica } = await Nuvem.cliente.rpc('push_chave_publica');
+      if (!publica) {
+        const r = await fetch(this.url(), { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: window.FROTA_NUVEM.chave }, body: '{"acao":"iniciar"}' });
+        publica = (await r.json().catch(() => ({}))).publica;
+      }
+      if (!publica) { aviso('❌ Falta instalar as notificações no Supabase (notificacoes.sql e a função "notificar").'); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const antiga = await reg.pushManager.getSubscription();
+      if (antiga) await antiga.unsubscribe();
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this.chave(publica) });
+      const j = sub.toJSON();
+      const { error } = await Nuvem.cliente.from('push_subscricoes').upsert({
+        endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_id: Nuvem.user.id, empresa_id: Equipa.empresa?.id || null,
+      }, { onConflict: 'endpoint' });
+      if (error) throw error;
+      aviso('🔔 Notificações ligadas!');
+      this.teste(true);
+    } catch (e) {
+      aviso('❌ Não foi possível ligar: ' + (e.message || e));
+    }
+    this.desenhar();
+  },
+  async teste(silencioso) {
+    const { data } = await Nuvem.cliente.auth.getSession();
+    const r = await fetch(this.url(), {
+      method: 'POST', body: '{"acao":"teste"}',
+      headers: { 'Content-Type': 'application/json', apikey: window.FROTA_NUVEM.chave, Authorization: 'Bearer ' + (data.session?.access_token || '') },
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!silencioso) aviso(j.enviadas ? '📨 Enviada! Deve aparecer daqui a uns segundos.' : '❌ A notificação não foi enviada.');
+  },
+  async desligar() {
+    const sub = await this.subscricao();
+    if (sub) {
+      await Nuvem.cliente.from('push_subscricoes').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe();
+    }
+    aviso('🔕 Notificações desligadas neste telemóvel.');
+    this.desenhar();
+  },
+};
+$('#notifAtivar').addEventListener('click', () => Notificacoes.ativar());
+$('#notifTeste').addEventListener('click', () => Notificacoes.teste(false));
+$('#notifDesligar').addEventListener('click', () => Notificacoes.desligar());
+
 /* ===================== Desenhar tudo ===================== */
 const RH = {
   desenhar() {
     Clientes.desenhar();
+    Notificacoes.desenhar();
     if (typeof Equipa === 'undefined' || !Equipa.ativa()) return;
     Escalas.desenhar();
     Recibos.desenhar();

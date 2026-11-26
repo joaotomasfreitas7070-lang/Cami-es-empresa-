@@ -50,3 +50,15 @@ Correr `supabase/equipa-3.sql` no Supabase (uma vez).
 - **🏢 Clientes** (Viagens → Clientes): ficha, histórico, faturado, por cobrar, preço habitual €/km.
 - **📅 Escalas** (Equipa → Escalas): turnos por pessoa/carrinha, repetição, avisos de conflitos e férias.
 - **📄 Relatórios em PDF:** relatório do mês, mapa de salários e recibos (imprimir / guardar como PDF).
+
+## 🔔 Notificações no telemóvel (Web Push)
+1. Correr `supabase/notificacoes.sql` no Supabase (ativa pg_net e pg_cron, cria as tabelas e o resumo das 07:30).
+2. Supabase → **Edge Functions → Deploy a new function → Via editor**, nome **`notificar`**, colar
+   `supabase/functions/notificar/index.ts` → Deploy. Depois, nas definições da função, **desligar "Verify JWT"**
+   (a função tem a sua própria proteção: segredo guardado na base de dados).
+3. No site: **⚙️ Mais → 🔔 Ativar neste telemóvel** (no iPhone, abrir pelo ícone do ecrã principal; iOS 16.4+).
+
+As chaves VAPID e o segredo são criados sozinhos na primeira utilização e ficam em `push_config` (sem acesso pelo site).
+Avisos na hora: pedidos de férias (quem aprova), respostas às férias, avarias (mecânico/logística; urgentes ficam no ecrã),
+problema resolvido, recibo fechado, turnos novos. Resumo diário: aniversários, férias da equipa, turno do dia,
+seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
