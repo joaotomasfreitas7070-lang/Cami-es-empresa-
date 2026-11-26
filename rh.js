@@ -134,6 +134,94 @@ const Salarios = {
       ${l('Custo para a empresa', euro(v.custo))}`;
   },
 
+  vista: 'mes', medida: 'liquido',
+
+  // Folha do mês: todas as colunas, como o mapa de salários em Excel; edita-se diretamente nos rascunhos.
+  desenharFolha(procs) {
+    const tot = {};
+    const somar = (k, v) => { tot[k] = (tot[k] || 0) + N(v); };
+    const campo = (p, k, cls = '') => (p.estado === 'Rascunho'
+      ? `<input type="number" inputmode="decimal" step="${k === 'diasTrabalhados' ? 1 : 0.5}" min="${k === 'outros' ? '' : 0}" class="${cls}" data-proc="${p.id}" data-campo="${k}" value="${N(p[k]) || ''}" aria-label="${k}">`
+      : (N(p[k]) ? num(p[k], k === 'diasTrabalhados' ? 0 : 1) : '—'));
+    const linhas = procs.map((p) => {
+      const v = this.valores(p), f = this.fichaDe(p.membroId);
+      ['diasTrabalhados', 'faltas', 'he1', 'he2', 'heDescanso'].forEach((k) => somar(k, p[k]));
+      ['base', 'he', 'descFaltas', 'subF', 'subN', 'outros', 'bruto', 'ssTrab', 'irs', 'adiant', 'sa', 'liquido', 'ssEmp', 'fct', 'seg', 'custo'].forEach((k) => somar(k, v[k]));
+      const e = { Rascunho: '<span class="badge medio">Rascunho</span>', Fechado: '<span class="badge ok">Fechado</span>', Pago: '<span class="badge ok">✓ Pago</span>' }[p.estado] || '';
+      const din = (k, val) => (p.estado === 'Rascunho' ? `<input type="number" inputmode="decimal" step="0.01" data-proc="${p.id}" data-campo="${k}" value="${N(p[k]) || ''}" aria-label="${k}">` : euro(val));
+      return `<tr class="${p.estado === 'Rascunho' ? '' : 'fechado'}"><td data-abrir="${p.id}">${esc(p.nome)}<small>${esc(f?.categoria || '')} · ver recibo ›</small></td>
+        <td>${campo(p, 'diasTrabalhados', 'dias')}</td><td>${campo(p, 'faltas', 'dias')}</td><td>${campo(p, 'he1', 'dias')}</td><td>${campo(p, 'he2', 'dias')}</td><td>${campo(p, 'heDescanso', 'dias')}</td>
+        <td>${euro(v.base)}</td><td>${euro(v.he)}</td><td>${v.descFaltas ? '−' + euro(v.descFaltas) : '—'}</td>
+        <td>${din('subFerias', v.subF)}</td><td>${din('subNatal', v.subN)}</td><td>${din('outros', v.outros)}</td><td class="forte">${euro(v.bruto)}</td>
+        <td>${euro(v.ssTrab)}</td><td>${euro(v.irs)}<br><small>${num(v.taxaIrs, 1)} %</small></td><td>${din('adiantamento', v.adiant)}</td>
+        <td>${euro(v.sa)}</td><td class="liquido">${euro(v.liquido)}</td>
+        <td>${euro(v.ssEmp)}</td><td>${euro(v.fct)}</td><td>${euro(v.seg)}</td><td class="custo">${euro(v.custo)}</td><td>${e}</td></tr>`;
+    }).join('');
+    const semProc = this.fichas().filter((f) => !procs.some((p) => p.membroId === f.membroId));
+    const q = this.param();
+    $('#tabelaSalarios').innerHTML = procs.length ? `
+      <thead><tr><th></th><th colspan="5" class="grupo">Tempo</th><th colspan="7" class="grupo">Abonos</th><th colspan="3" class="grupo">Descontos</th>
+        <th class="grupo">Isento</th><th class="grupo">Pagar</th><th colspan="4" class="grupo">Custos da empresa</th><th></th></tr>
+      <tr><th>Pessoa</th><th>Dias</th><th>Faltas</th><th>HE 1.ª h</th><th>HE seg.</th><th>HE desc.</th>
+        <th>Base</th><th>Horas extra</th><th>Faltas</th><th>Sub. férias</th><th>Sub. Natal</th><th>Outros</th><th>Bruto</th>
+        <th>SS ${num(q.ssTrabalhador, 0)} %</th><th>IRS</th><th>Adiant.</th><th>Sub. alim.</th><th>A receber</th>
+        <th>SS ${num(q.ssEmpresa, 2)} %</th><th>FCT</th><th>Seg. AT</th><th>Custo</th><th>Estado</th></tr></thead>
+      <tbody>${linhas}
+      <tr class="total"><td>Total (${procs.length})</td><td>${num(tot.diasTrabalhados)}</td><td>${num(tot.faltas, 1)}</td><td>${num(tot.he1, 1)}</td><td>${num(tot.he2, 1)}</td><td>${num(tot.heDescanso, 1)}</td>
+        <td>${euro(tot.base)}</td><td>${euro(tot.he)}</td><td>${tot.descFaltas ? '−' + euro(tot.descFaltas) : '—'}</td><td>${euro(tot.subF)}</td><td>${euro(tot.subN)}</td><td>${euro(tot.outros)}</td>
+        <td>${euro(tot.bruto)}</td><td>${euro(tot.ssTrab)}</td><td>${euro(tot.irs)}</td><td>${euro(tot.adiant)}</td><td>${euro(tot.sa)}</td><td class="liquido">${euro(tot.liquido)}</td>
+        <td>${euro(tot.ssEmp)}</td><td>${euro(tot.fct)}</td><td>${euro(tot.seg)}</td><td class="custo">${euro(tot.custo)}</td><td></td></tr>
+      ${semProc.length ? `<tr><td colspan="23" class="ajuda">Por preparar: ${semProc.map((f) => esc(f.nome)).join(', ')} — toque em "Preparar o mês".</td></tr>` : ''}</tbody>`
+      : `<tbody><tr><td class="ajuda">${this.fichas().length ? 'Toque em "Preparar o mês para todos".' : 'Ainda não há fichas. Crie-as em baixo e depois toque em "Preparar o mês".'}</td></tr></tbody>`;
+    $('#salCartoes').innerHTML = `
+      <div class="cartao"><small>Bruto</small><strong>${euro(tot.bruto)}</strong></div>
+      <div class="cartao verde"><small>A pagar</small><strong>${euro(tot.liquido)}</strong></div>
+      <div class="cartao destaque"><small>Custo empresa</small><strong>${euro(tot.custo)}</strong></div>`;
+    return tot;
+  },
+
+  // Resumo do ano: mês a mês por pessoa (como a folha de subsídios do Excel).
+  desenharAno() {
+    const ano = this.mesAtual().slice(0, 4), med = this.medida;
+    const procs = dados.processamentos.filter((p) => p.mes.startsWith(ano));
+    const pessoas = [...new Map([...this.fichas().map((f) => [f.membroId, f.nome]), ...procs.map((p) => [p.membroId, p.nome])]).entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    const totMes = Array(12).fill(0);
+    let totAno = 0, totSubF = 0, totSubN = 0;
+    const linhas = pessoas.map(([id, nome]) => {
+      let soma = 0, subF = 0, subN = 0;
+      const cel = MESES.map((_, i) => {
+        const p = procs.find((x) => x.membroId === id && x.mes === `${ano}-${pad2(i + 1)}`);
+        if (!p) return '<td>—</td>';
+        const v = this.valores(p);
+        soma += v[med]; totMes[i] += v[med]; subF += v.subF; subN += v.subN;
+        return `<td class="${p.estado === 'Rascunho' ? 'ajuda' : ''}">${euro(v[med])}</td>`;
+      }).join('');
+      totAno += soma; totSubF += subF; totSubN += subN;
+      return `<tr><td>${esc(nome)}</td>${cel}<td class="custo">${euro(soma)}</td><td>${subF ? euro(subF) : '—'}</td><td>${subN ? euro(subN) : '—'}</td></tr>`;
+    }).join('');
+    $$('#medidaAno .chip').forEach((c) => c.classList.toggle('ativo', c.dataset.medida === med));
+    $('#tabelaAno').innerHTML = pessoas.length ? `<thead><tr><th>${ano}</th>${MESES.map((n) => `<th>${n.slice(0, 3)}</th>`).join('')}<th>Total</th><th>Sub. férias</th><th>Sub. Natal</th></tr></thead>
+      <tbody>${linhas}<tr class="total"><td>Total</td>${totMes.map((v) => `<td>${v ? euro(v) : '—'}</td>`).join('')}<td class="custo">${euro(totAno)}</td><td>${euro(totSubF)}</td><td>${euro(totSubN)}</td></tr></tbody>`
+      : '<tbody><tr><td class="ajuda">Sem salários neste ano.</td></tr></tbody>';
+  },
+
+  fecharTodos(estadoNovo) {
+    const m = this.mesAtual();
+    const alvo = dados.processamentos.filter((p) => p.mes === m && p.estado === (estadoNovo === 'Fechado' ? 'Rascunho' : 'Fechado'));
+    if (!alvo.length) return;
+    const txt = estadoNovo === 'Fechado'
+      ? `Fechar ${nomeMes(m)} para ${alvo.length} pessoa${alvo.length > 1 ? 's' : ''}?\n\nCada pessoa passa a ver o seu recibo e os valores ficam fixos.`
+      : `Marcar ${alvo.length} recibo${alvo.length > 1 ? 's' : ''} de ${nomeMes(m)} como pago${alvo.length > 1 ? 's' : ''}?`;
+    if (!confirm(txt)) return;
+    alvo.forEach((p) => {
+      if (estadoNovo === 'Fechado') Object.assign(p, { valores: this.calc(p), estado: 'Fechado', fechadoEm: hojeISO(), userId: membroPorId(p.membroId)?.user_id || p.userId });
+      else Object.assign(p, { estado: 'Pago', pagoEm: hojeISO() });
+    });
+    guardar(); desenhar();
+    aviso(estadoNovo === 'Fechado' ? `✓ ${nomeMes(m)} fechado. Cada pessoa já vê o seu recibo.` : '💶 Marcados como pagos');
+  },
+
   abrir(id) {
     const p = dados.processamentos.find((x) => x.id === id);
     if (!p) return;
@@ -174,20 +262,13 @@ const Salarios = {
     if (this.ligarContas()) guardar();
 
     const procs = dados.processamentos.filter((p) => p.mes === m).sort((a, b) => a.nome.localeCompare(b.nome));
-    const tot = { bruto: 0, liquido: 0, custo: 0 };
-    let linhas = procs.map((p) => {
-      const v = this.valores(p);
-      tot.bruto += v.bruto; tot.liquido += v.liquido; tot.custo += v.custo;
-      const e = { Rascunho: '<span class="badge medio">Rascunho</span>', Fechado: '<span class="badge ok">Fechado</span>', Pago: '<span class="badge ok">✓ Pago</span>' }[p.estado] || '';
-      return `<tr data-proc="${p.id}"><td>${esc(p.nome)}${p.he1 || p.he2 || p.heDescanso ? ' <small>⏱</small>' : ''}</td><td>${euro(v.bruto)}</td>
-        <td><b>${euro(v.liquido)}</b></td><td>${euro(v.custo)}</td><td class="estado-sal">${e}</td></tr>`;
-    }).join('');
-    const semProc = this.fichas().filter((f) => !procs.some((p) => p.membroId === f.membroId));
-    if (semProc.length) linhas += `<tr><td colspan="5" class="ajuda">Por preparar: ${semProc.map((f) => esc(f.nome)).join(', ')}</td></tr>`;
-    $('#tabelaSalarios').innerHTML = procs.length || semProc.length
-      ? `<tr><th>Pessoa</th><th>Bruto</th><th>A receber</th><th>Custo</th><th>Estado</th></tr>${linhas}
-         ${procs.length ? `<tr class="total"><td>Total</td><td>${euro(tot.bruto)}</td><td>${euro(tot.liquido)}</td><td>${euro(tot.custo)}</td><td></td></tr>` : ''}`
-      : '<tr><td class="ajuda">Ainda não há fichas. Crie-as em baixo e depois toque em "Preparar o mês".</td></tr>';
+    const tot = this.desenharFolha(procs);
+    this.desenharAno();
+    $$('#vistaSalarios .chip').forEach((c) => c.classList.toggle('ativo', c.dataset.vista === this.vista));
+    $('#blocoFolhaMes').hidden = this.vista !== 'mes';
+    $('#blocoFolhaAno').hidden = this.vista !== 'ano';
+    $('#btnFecharTodos').hidden = !procs.some((p) => p.estado === 'Rascunho');
+    $('#btnPagarTodos').hidden = !procs.some((p) => p.estado === 'Fechado');
     $('#salCartoes').innerHTML = `
       <div class="cartao"><small>Bruto</small><strong>${euro(tot.bruto)}</strong></div>
       <div class="cartao verde"><small>A pagar</small><strong>${euro(tot.liquido)}</strong></div>
@@ -596,11 +677,163 @@ $('#notifAtivar').addEventListener('click', () => Notificacoes.ativar());
 $('#notifTeste').addEventListener('click', () => Notificacoes.teste(false));
 $('#notifDesligar').addEventListener('click', () => Notificacoes.desligar());
 
+/* ===================== BLOQUEIO DA APP ===================== */
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const deB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
+
+const Bloqueio = {
+  trancada: false, escondidaEm: null, faceIdPossivel: null,
+  chave(t) { return `frota-${t}-${Nuvem.user?.id}`; },
+  ler(t) { try { return JSON.parse(localStorage.getItem(this.chave(t))); } catch (e) { return null; } },
+  gravar(t, v) { try { if (v == null) localStorage.removeItem(this.chave(t)); else localStorage.setItem(this.chave(t), JSON.stringify(v)); } catch (e) { /* */ } },
+  minutos() { try { return Number(localStorage.getItem('frota-bloq-min')) || 5; } catch (e) { return 5; } },
+  temPin() { return !!this.ler('pin'); },
+  temFaceId() { return !!this.ler('faceid'); },
+  async hash(pin, sal) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${sal}:${pin}`));
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  },
+
+  trancar() {
+    if (!Nuvem.user || Nuvem.recuperacao) return;
+    this.trancada = true;
+    document.body.classList.add('trancado');
+    $('#ecraBloqueio').hidden = false;
+    $('#bloqOla').textContent = `Olá, ${(Equipa.eu?.nome || Nuvem.user.email || '').split(/[\s@]/)[0]}! 🔒`;
+    $('#bloqFaceId').hidden = !this.temFaceId();
+    $('#bloqInfo').textContent = this.temPin() || this.temFaceId() ? '' : 'Dica: depois de entrar, crie um PIN em Mais → Segurança (funciona sem internet).';
+    this.modo(this.temPin() ? 'pin' : 'senha');
+  },
+  modo(m) {
+    const f = $('#bloqForm');
+    $('#bloqPinBloco').hidden = m !== 'pin';
+    $('#bloqSenhaBloco').hidden = m !== 'senha';
+    f.elements.pin.required = m === 'pin';
+    f.elements.senha.required = m === 'senha';
+    $('#bloqUsarSenha').textContent = m === 'pin' ? 'Usar a palavra-passe' : 'Usar o PIN';
+    $('#bloqUsarSenha').hidden = m === 'senha' && !this.temPin();
+    this.modoAtual = m;
+    setTimeout(() => (m === 'pin' ? f.elements.pin : f.elements.senha).focus(), 50);
+  },
+  abrir() {
+    this.trancada = false;
+    this.gravar('falhas', 0);
+    document.body.classList.remove('trancado');
+    $('#ecraBloqueio').hidden = true;
+    $('#bloqForm').reset();
+  },
+  async tentarPin(pin) {
+    const p = this.ler('pin');
+    if (p && (await this.hash(pin, p.sal)) === p.hash) { this.abrir(); return; }
+    const f = (this.ler('falhas') || 0) + 1;
+    this.gravar('falhas', f);
+    $('#bloqForm').elements.pin.value = '';
+    if (f >= 5) {
+      alert('PIN errado 5 vezes. Por segurança, tem de entrar outra vez com o email e a palavra-passe.');
+      this.gravar('falhas', 0);
+      await this.sairConta();
+      return;
+    }
+    $('#bloqInfo').textContent = `❌ PIN errado. ${5 - f} tentativa${5 - f === 1 ? '' : 's'} até ter de usar a palavra-passe.`;
+  },
+  async tentarSenha(senha) {
+    if (!navigator.onLine) { $('#bloqInfo').textContent = '📶 Sem internet: use o PIN ou o Face ID.'; return; }
+    const { error } = await Nuvem.cliente.auth.signInWithPassword({ email: Nuvem.user.email, password: senha });
+    if (error) { $('#bloqInfo').textContent = /invalid/i.test(error.message) ? '❌ Palavra-passe errada.' : '❌ ' + error.message; return; }
+    this.abrir();
+    if (!this.temPin()) aviso('💡 Crie um PIN em Mais → Segurança para abrir mais depressa.');
+  },
+  async sairConta() {
+    this.abrir();
+    await Nuvem.cliente.auth.signOut();
+  },
+
+  async faceIdDisponivel() {
+    if (this.faceIdPossivel === null) {
+      try { this.faceIdPossivel = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { this.faceIdPossivel = false; }
+    }
+    return this.faceIdPossivel;
+  },
+  async ativarFaceId() {
+    try {
+      const cred = await navigator.credentials.create({ publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'Transportes Freitas', id: location.hostname },
+        user: { id: new TextEncoder().encode(Nuvem.user.id), name: Nuvem.user.email, displayName: Equipa.eu?.nome || Nuvem.user.email },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+        timeout: 60000,
+      } });
+      this.gravar('faceid', b64url(cred.rawId));
+      aviso('🙂 Face ID / impressão digital ligado');
+    } catch (e) { aviso('Não foi possível ligar o Face ID: ' + (e.message || e)); }
+    this.desenhar();
+  },
+  async usarFaceId() {
+    try {
+      await navigator.credentials.get({ publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname, userVerification: 'required', timeout: 60000,
+        allowCredentials: [{ type: 'public-key', id: deB64url(this.ler('faceid')), transports: ['internal'] }],
+      } });
+      this.abrir();
+    } catch (e) { $('#bloqInfo').textContent = 'Não foi possível usar o Face ID. Use o PIN ou a palavra-passe.'; }
+  },
+
+  async desenhar() {
+    if (this.trancada && Equipa.eu?.nome) $('#bloqOla').textContent = `Olá, ${Equipa.eu.nome.split(' ')[0]}! 🔒`;
+    $('#blocoSeguranca').hidden = !Nuvem.user;
+    if (!Nuvem.user) return;
+    const pin = this.temPin(), face = this.temFaceId(), pode = await this.faceIdDisponivel();
+    $('#segEstado').innerHTML = `PIN: <b>${pin ? '✓ criado' : 'não criado'}</b> · Face ID / impressão digital: <b>${face ? '✓ ligado' : pode ? 'desligado' : 'não disponível neste aparelho'}</b>`;
+    $('#segPin').textContent = pin ? '🔢 Mudar PIN' : '🔢 Criar PIN';
+    $('#segFaceId').hidden = face || !pode;
+    $('#segRemoverPin').hidden = !pin;
+    $('#segRemoverFaceId').hidden = !face;
+    if (document.activeElement !== $('#segMinutos')) $('#segMinutos').value = String(this.minutos());
+  },
+};
+
+$('#bloqForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = e.target.elements;
+  if (Bloqueio.modoAtual === 'pin') Bloqueio.tentarPin(f.pin.value.trim()); else Bloqueio.tentarSenha(f.senha.value);
+});
+$('#bloqForm').elements.pin.addEventListener('input', (e) => {
+  const p = Bloqueio.ler('pin');
+  if (p && e.target.value.length === p.tamanho) Bloqueio.tentarPin(e.target.value); // entra sozinho ao escrever o último número
+});
+$('#bloqUsarSenha').addEventListener('click', () => Bloqueio.modo(Bloqueio.modoAtual === 'pin' ? 'senha' : 'pin'));
+$('#bloqFaceId').addEventListener('click', () => Bloqueio.usarFaceId());
+$('#bloqSair').addEventListener('click', () => { if (confirm('Sair da conta neste telemóvel?')) Bloqueio.sairConta(); });
+$('#segPin').addEventListener('click', () => { $('#formPin').hidden = false; $('#formPin').elements.pin.focus(); });
+$('#formPin').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const { pin, pin2 } = Object.fromEntries(new FormData(e.target));
+  if (!/^\d{4,6}$/.test(pin)) { aviso('O PIN tem de ter 4 a 6 números.'); return; }
+  if (pin !== pin2) { aviso('Os dois PIN não são iguais.'); return; }
+  const sal = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  Bloqueio.gravar('pin', { sal, hash: await Bloqueio.hash(pin, sal), tamanho: pin.length });
+  e.target.reset(); e.target.hidden = true;
+  aviso('🔢 PIN guardado neste telemóvel');
+  Bloqueio.desenhar();
+});
+$('#segFaceId').addEventListener('click', () => Bloqueio.ativarFaceId());
+$('#segRemoverPin').addEventListener('click', () => { if (confirm('Remover o PIN deste telemóvel?')) { Bloqueio.gravar('pin', null); Bloqueio.desenhar(); } });
+$('#segRemoverFaceId').addEventListener('click', () => { Bloqueio.gravar('faceid', null); Bloqueio.desenhar(); });
+$('#segBloquear').addEventListener('click', () => Bloqueio.trancar());
+$('#segMinutos').addEventListener('change', (e) => { try { localStorage.setItem('frota-bloq-min', e.target.value); } catch (er) { /* */ } aviso('✅ Guardado'); });
+// Volta a pedir o desbloqueio quando a app esteve em segundo plano
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') Bloqueio.escondidaEm = Date.now();
+  else if (Bloqueio.escondidaEm && Date.now() - Bloqueio.escondidaEm > Bloqueio.minutos() * 60000) Bloqueio.trancar();
+});
+
 /* ===================== Desenhar tudo ===================== */
 const RH = {
   desenhar() {
     Clientes.desenhar();
     Notificacoes.desenhar();
+    Bloqueio.desenhar();
     if (typeof Equipa === 'undefined' || !Equipa.ativa()) return;
     Escalas.desenhar();
     Recibos.desenhar();
@@ -672,7 +905,20 @@ $('#btnMapaCsv').addEventListener('click', () => {
   descarregar(`salarios-${m}.csv`, csv(linhas), 'text/csv;charset=utf-8');
 });
 
-$('#tabelaSalarios').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-proc]'); if (tr) Salarios.abrir(tr.dataset.proc); });
+$('#tabelaSalarios').addEventListener('click', (e) => { const td = e.target.closest('td[data-abrir]'); if (td) Salarios.abrir(td.dataset.abrir); });
+// Escrever diretamente na folha (só rascunhos)
+$('#tabelaSalarios').addEventListener('change', (e) => {
+  const el = e.target.closest('input[data-proc]');
+  if (!el) return;
+  const p = dados.processamentos.find((x) => x.id === el.dataset.proc);
+  if (!p || p.estado !== 'Rascunho') return;
+  p[el.dataset.campo] = N(el.value);
+  guardar(); desenhar();
+});
+$('#btnFecharTodos').addEventListener('click', () => Salarios.fecharTodos('Fechado'));
+$('#btnPagarTodos').addEventListener('click', () => Salarios.fecharTodos('Pago'));
+$('#vistaSalarios').addEventListener('click', (e) => { const c = e.target.closest('[data-vista]'); if (c) { Salarios.vista = c.dataset.vista; Salarios.desenhar(); } });
+$('#medidaAno').addEventListener('click', (e) => { const c = e.target.closest('[data-medida]'); if (c) { Salarios.medida = c.dataset.medida; Salarios.desenharAno(); } });
 $('#formProcessamento').addEventListener('input', () => Salarios.desenharEditor());
 $('#formProcessamento').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -742,5 +988,6 @@ document.addEventListener('click', (e) => {
 
 /* ===================== Arranque ===================== */
 desenhar();
-Nuvem.iniciar();
+// Ao abrir a app com a sessão guardada, pede o desbloqueio (Face ID / PIN / palavra-passe).
+Nuvem.iniciar().then(() => { if (Nuvem.user) Bloqueio.trancar(); });
 setTimeout(() => Nuvem.arrancou(), 6000); // por segurança, nunca fica preso no ecrã inicial

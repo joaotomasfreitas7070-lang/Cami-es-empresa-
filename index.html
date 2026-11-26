@@ -20,6 +20,28 @@
 <body class="a-arrancar">
   <div id="ecraCarregar" class="ecra-carregar"><img src="img/logo.png" alt="Transportes Freitas"></div>
 
+  <div id="ecraBloqueio" class="ecra-login" hidden>
+    <div class="login-caixa">
+      <img src="img/logo.png" alt="Transportes Freitas" class="login-logo pequeno">
+      <p class="login-sub" id="bloqOla">Olá!</p>
+      <form id="bloqForm" autocomplete="off">
+        <div id="bloqPinBloco">
+          <label>PIN<input type="password" name="pin" class="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></label>
+        </div>
+        <div id="bloqSenhaBloco" hidden>
+          <label>Palavra-passe<input type="password" name="senha" autocomplete="current-password"></label>
+        </div>
+        <button type="submit" class="principal">Desbloquear</button>
+        <button type="button" id="bloqFaceId" class="biometria" hidden>🔓 Usar Face ID / impressão digital</button>
+        <div class="login-links">
+          <button type="button" class="link" id="bloqUsarSenha">Usar a palavra-passe</button>
+          <button type="button" class="link" id="bloqSair">Sair da conta</button>
+        </div>
+        <p class="ajuda" id="bloqInfo"></p>
+      </form>
+    </div>
+  </div>
+
   <div id="ecraLogin" class="ecra-login" hidden>
     <div class="login-caixa">
       <img src="img/logo.png" alt="Transportes Freitas" class="login-logo">
@@ -470,8 +492,26 @@
             <button type="button" id="btnMapaPdf">🖨️ Mapa (PDF)</button>
             <button type="button" id="btnMapaCsv">📄 Mapa (Excel)</button>
           </div>
-          <p class="ajuda">Toque numa pessoa para lançar faltas, horas extra e adiantamentos.</p>
-          <div class="tabela-wrap espaco"><table class="tabela clicavel" id="tabelaSalarios"></table></div>
+          <div class="filtros espaco" id="vistaSalarios">
+            <button type="button" class="chip ativo" data-vista="mes">📋 Folha do mês</button>
+            <button type="button" class="chip" data-vista="ano">📅 Resumo do ano</button>
+          </div>
+          <div id="blocoFolhaMes">
+            <p class="ajuda">Escreva diretamente na folha (faltas, horas extra, adiantamentos…). Toque no nome para ver o recibo.</p>
+            <div class="folha-wrap espaco"><table class="folha" id="tabelaSalarios"></table></div>
+            <div class="botoes espaco">
+              <button type="button" id="btnFecharTodos">✓ Fechar o mês para todos</button>
+              <button type="button" id="btnPagarTodos">💶 Marcar todos como pagos</button>
+            </div>
+          </div>
+          <div id="blocoFolhaAno" hidden>
+            <div class="filtros espaco" id="medidaAno">
+              <button type="button" class="chip ativo" data-medida="liquido">A receber</button>
+              <button type="button" class="chip" data-medida="bruto">Bruto</button>
+              <button type="button" class="chip" data-medida="custo">Custo empresa</button>
+            </div>
+            <div class="folha-wrap espaco"><table class="folha" id="tabelaAno"></table></div>
+          </div>
 
           <form id="formProcessamento" class="formulario" hidden>
             <h3 id="procTitulo"></h3>
@@ -622,6 +662,33 @@
           <p class="ajuda">Recebe na hora: pedidos de férias (RH), avarias (mecânico/logística), respostas às suas férias, recibos e turnos novos.
             E todas as manhãs (07:30) um resumo: aniversários, férias da equipa, o seu turno e seguros/inspeções a terminar.</p>
           <p class="ajuda">📱 No iPhone: primeiro adicione o site ao ecrã principal e abra-o pelo ícone (iOS 16.4 ou mais recente).</p>
+        </div>
+      </div>
+
+      <div id="blocoSeguranca" hidden>
+        <h2>🔒 Segurança</h2>
+        <div class="caixa">
+          <p>Ao abrir a app, e quando volta a ela depois de algum tempo, é pedido o <b>Face ID</b>, o <b>PIN</b> ou a <b>palavra-passe</b>.</p>
+          <p class="ajuda" id="segEstado"></p>
+          <form id="formPin" class="espaco" hidden>
+            <div class="grid2">
+              <label>Novo PIN (4 a 6 números)<input type="password" name="pin" class="pin" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="6" required autocomplete="off"></label>
+              <label>Repita o PIN<input type="password" name="pin2" class="pin" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="6" required autocomplete="off"></label>
+            </div>
+            <button type="submit" class="principal">Guardar PIN</button>
+          </form>
+          <div class="botoes espaco">
+            <button type="button" id="segPin">🔢 Criar PIN</button>
+            <button type="button" id="segFaceId" hidden>🙂 Ativar Face ID</button>
+            <button type="button" id="segBloquear">🔒 Bloquear agora</button>
+          </div>
+          <label class="espaco">Bloquear quando a app fica em segundo plano mais de
+            <select id="segMinutos"><option value="1">1 minuto</option><option value="5">5 minutos</option><option value="15">15 minutos</option><option value="60">1 hora</option></select>
+          </label>
+          <div class="botoes espaco">
+            <button type="button" id="segRemoverPin" class="link" hidden>Remover PIN</button>
+            <button type="button" id="segRemoverFaceId" class="link" hidden>Desligar Face ID</button>
+          </div>
         </div>
       </div>
 

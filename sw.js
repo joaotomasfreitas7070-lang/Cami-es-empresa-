@@ -1,6 +1,6 @@
 // Guarda uma cópia do site no dispositivo para abrir sem internet.
 // Estratégia: tenta sempre a versão mais recente da internet; sem rede usa a cópia.
-const CACHE = 'freitas-v7';
+const CACHE = 'freitas-v8';
 const FICHEIROS = [
   './', 'index.html', 'style.css', 'app.js', 'equipa.js', 'rh.js', 'config.js', 'manifest.webmanifest',
   'img/logo.png', 'img/logo-128.png', 'img/favicon.png', 'img/apple-touch-icon.png',

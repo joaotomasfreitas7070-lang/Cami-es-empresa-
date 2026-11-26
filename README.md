@@ -62,3 +62,11 @@ As chaves VAPID e o segredo são criados sozinhos na primeira utilização e fic
 Avisos na hora: pedidos de férias (quem aprova), respostas às férias, avarias (mecânico/logística; urgentes ficam no ecrã),
 problema resolvido, recibo fechado, turnos novos. Resumo diário: aniversários, férias da equipa, turno do dia,
 seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
+
+## 🔒 Desbloqueio e folha de salários completa
+- Ao abrir a app (e ao voltar depois de X minutos em segundo plano, por defeito 5) é pedido o **Face ID / impressão
+  digital**, o **PIN** (4–6 números, guardado só como impressão cifrada no telemóvel) ou a **palavra-passe**.
+  5 PIN errados → sai da conta. Configurar em **Mais → Segurança**. O PIN e o Face ID funcionam sem internet.
+- **Folha de salários** (Equipa → Salários): todas as colunas do mapa (tempo, abonos, descontos, sub. alimentação,
+  a receber, SS empresa, FCT, seguro AT, custo), edição direta nos rascunhos, fechar/pagar todos, e **resumo do ano**
+  mês a mês por pessoa (a receber / bruto / custo) com subsídios de férias e Natal.
