@@ -446,3 +446,24 @@ body.trancado { padding-bottom: 0; }
 .login-logo.pequeno { width: min(40vw, 150px); }
 input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; font-weight: 800; }
 button.biometria { width: 100%; margin-top: 10px; }
+
+/* ============ Painel por papel ============ */
+.painel-blocos { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.painel-blocos:empty { display: none; }
+.bloco { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px 14px; box-shadow: var(--sombra); }
+.bloco h3 { margin: 0 0 6px; font-size: .92rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bloco h3 button { font-size: .78rem; padding: 4px 9px; }
+.bloco .l { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--borda); font-size: .9rem; }
+.bloco .l:first-of-type { border-top: 0; }
+.bloco .l > span:first-child { min-width: 0; }
+.bloco .l small { color: var(--suave); display: block; }
+.bloco .l b { white-space: nowrap; }
+.bloco .vazio-mini { color: var(--suave); font-size: .86rem; padding: 4px 0; }
+.bloco.destaque-bloco { border-left: 4px solid var(--marca); }
+.van-estado { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--borda); }
+.van-estado:first-of-type { border-top: 0; }
+.van-estado .info { flex: 1; min-width: 0; font-size: .88rem; }
+.van-estado .info small { display: block; color: var(--suave); }
+.semaforo { font-size: 1.1rem; }
+details.docs-conducao { margin-top: 12px; border: 1px dashed var(--borda); border-radius: 12px; padding: 4px 12px 10px; }
+details.docs-conducao summary { cursor: pointer; font-weight: 700; padding: 8px 0; color: var(--texto); }

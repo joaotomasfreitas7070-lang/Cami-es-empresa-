@@ -168,6 +168,20 @@ async function diario() {
         }
       }
     }
+    // Documentos de condução a terminar (60, 30, 7 dias, no dia e no dia seguinte a expirar)
+    const docsPessoas = await sql`select user_id, nome, to_jsonb(m) ->> 'carta_validade' as carta, to_jsonb(m) ->> 'cqm_validade' as cqm,
+      to_jsonb(m) ->> 'tacografo_validade' as tacografo, to_jsonb(m) ->> 'exame_medico_validade' as exame from public.membros m where empresa_id = ${e}`;
+    const gestores = eq.com('pessoas_gerir', 'escalas_gerir');
+    for (const m of docsPessoas) {
+      for (const [campo, nome] of [['carta', 'Carta de condução'], ['cqm', 'CQM / CAM'], ['tacografo', 'Cartão de tacógrafo'], ['exame', 'Exame médico']]) {
+        if (!m[campo]) continue;
+        const dias = diasEntre(hoje, m[campo]);
+        if (![60, 30, 7, 0, -1].includes(dias)) continue;
+        const quando = dias === 0 ? 'termina hoje' : dias < 0 ? 'expirou ontem' : `termina em ${dias} dias`;
+        if (m.user_id) juntar([m.user_id], `🪪 ${nome}: ${quando} — trate da renovação`);
+        juntar(gestores.filter((u) => u !== m.user_id), `🪪 ${m.nome}: ${nome.toLowerCase()} ${quando}`);
+      }
+    }
     if (pendentes) juntar(eq.com('ferias_aprovar'), `🏖️ ${pendentes} pedido${pendentes > 1 ? 's' : ''} de férias por aprovar`);
     if (abertos) juntar(eq.com('ocorrencias_gerir'), paradas ? `🔴 ${paradas} carrinha${paradas > 1 ? 's' : ''} parada${paradas > 1 ? 's' : ''} · ${abertos} problema${abertos > 1 ? 's' : ''} por resolver` : `🔧 ${abertos} problema${abertos > 1 ? 's' : ''} por resolver`);
 

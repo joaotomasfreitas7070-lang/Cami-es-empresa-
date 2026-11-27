@@ -347,6 +347,8 @@ const Escalas = {
     const out = [];
     const aus = this.ausente(t);
     if (aus) out.push(`${this.nome(t)} está de ${aus.tipo.toLowerCase()}`);
+    const m = membroPorId(t.membroId);
+    if (m?.carta_validade && String(m.carta_validade).slice(0, 10) < t.data) out.push(`a carta de condução de ${this.nome(t)} já expirou nesse dia`);
     lista.forEach((o) => {
       if (o.id === t.id || !this.sobrepoe(o, t)) return;
       if (o.membroId === t.membroId) out.push(`${this.nome(t)} já tem turno ${o.inicio}–${o.fim}`);
@@ -355,7 +357,18 @@ const Escalas = {
     return out;
   },
 
+  ligarContas() {
+    if (!Equipa.pode('escalas_gerir')) return false;
+    let mudou = false;
+    dados.escalas.forEach((t) => {
+      const m = membroPorId(t.membroId);
+      if (m?.user_id && t.userId !== m.user_id && t.data >= hojeISO()) { t.userId = m.user_id; mudou = true; }
+    });
+    return mudou;
+  },
+
   desenhar() {
+    if (this.ligarContas()) guardar();
     if (!this.semana) this.semana = this.segunda(hojeISO());
     const fim = somaDias(this.semana, 6), hoje = hojeISO();
     $('#semanaTitulo').textContent = `${Number(this.semana.slice(8))} ${MESES[Number(this.semana.slice(5, 7)) - 1].slice(0, 3)} – ${Number(fim.slice(8))} ${MESES[Number(fim.slice(5, 7)) - 1].slice(0, 3)}`;
@@ -365,7 +378,7 @@ const Escalas = {
     for (let i = 0; i < 7; i++) {
       const d = somaDias(this.semana, i), dow = new Date(d + 'T00:00:00').getDay();
       const feriado = feriados(Number(d.slice(0, 4))).has(d);
-      const turnos = dados.escalas.filter((t) => t.data === d && (this.filtro === 'todos' || t.userId === eu)).sort((a, b) => a.inicio.localeCompare(b.inicio));
+      const turnos = dados.escalas.filter((t) => t.data === d && (this.filtro === 'todos' || Equipa.meuTurno(t))).sort((a, b) => a.inicio.localeCompare(b.inicio));
       const ausentes = dados.ferias.filter((f) => f.estado === 'Aprovado' && f.inicio <= d && f.fim >= d).map((f) => Equipa.nomeDe(f._por));
       html += `<div class="dia ${d === hoje ? 'hoje' : ''} ${dow === 0 || dow === 6 || feriado ? 'fds' : ''}">
         <div class="dia-titulo"><span>${d === hoje ? 'Hoje · ' : ''}${DIAS_SEMANA[dow]}, ${dataPT(d).slice(0, 5)}</span>
@@ -373,8 +386,8 @@ const Escalas = {
         ${turnos.map((t) => {
           const c = this.conflitos(t);
           const van = dados.carrinhas.find((x) => x.id === t.carrinhaId);
-          return `<div class="turno ${t.userId === eu ? 'meu' : ''}"><span class="hora">${t.inicio}–${t.fim}</span>
-            <span class="quem">${esc(this.nome(t))}${t.userId === eu ? ' (eu)' : ''}<small>${[van?.matricula, t.notas].filter(Boolean).map(esc).join(' · ')}</small>
+          return `<div class="turno ${Equipa.meuTurno(t) ? 'meu' : ''}"><span class="hora">${t.inicio}–${t.fim}</span>
+            <span class="quem">${esc(this.nome(t))}${Equipa.meuTurno(t) ? ' (eu)' : ''}<small>${[van?.matricula, t.notas].filter(Boolean).map(esc).join(' · ')}</small>
             ${c.length ? `<small class="negativo">⚠️ ${esc(c.join('; '))}</small>` : ''}</span>
             ${gere ? `<span>${btnEditar('escalas', t.id)}${btnApagar('escalas', t.id)}</span>` : ''}</div>`;
         }).join('') || (ausentes.length ? '' : '<div class="ausente">Sem turnos</div>')}

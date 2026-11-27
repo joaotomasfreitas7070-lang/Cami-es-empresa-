@@ -122,6 +122,8 @@
         </div>
       </div>
 
+      <div id="painelBlocos" class="painel-blocos"></div>
+
       <div data-perm="financeiro">
       <div class="cartoes">
         <div class="cartao verde"><small>Receita</small><strong id="totReceita">0 €</strong></div>
@@ -346,6 +348,23 @@
           </form>
         </details>
 
+        <details class="caixa meus-dados" id="detMeusDocs">
+          <summary>🪪 Os meus documentos <span id="docsEstado"></span></summary>
+          <form id="formMeusDocs">
+            <p class="ajuda">Se conduz, ponha a validade da carta e dos outros documentos. É avisado antes de terminarem.</p>
+            <div class="grid2">
+              <label>Carta de condução válida até<input type="date" name="carta_validade"></label>
+              <label>Categorias da carta<input type="text" name="carta_categorias" placeholder="ex: B, C" autocapitalize="characters"></label>
+            </div>
+            <div class="grid3">
+              <label>CQM / CAM até<input type="date" name="cqm_validade"></label>
+              <label>Cartão tacógrafo até<input type="date" name="tacografo_validade"></label>
+              <label>Exame médico até<input type="date" name="exame_medico_validade"></label>
+            </div>
+            <button type="submit" class="principal">Guardar os meus documentos</button>
+          </form>
+        </details>
+
         <div class="subnav" data-subnav="equipa">
           <button type="button" class="chip" data-sub="problemas">⚠️ Problemas</button>
           <button type="button" class="chip" data-sub="ferias">🏖️ Férias</button>
@@ -483,6 +502,19 @@
             <label>Data de entrada<input type="date" name="data_entrada"></label>
           </div>
           <label>Contacto de emergência (opcional)<input type="text" name="contacto_emergencia" placeholder="ex: Maria (mãe) 913 000 000"></label>
+          <details class="docs-conducao">
+            <summary>🪪 Documentos de condução (opcional)</summary>
+            <div class="grid2">
+              <label>Carta de condução válida até<input type="date" name="carta_validade"></label>
+              <label>Categorias da carta<input type="text" name="carta_categorias" placeholder="ex: B, C" autocapitalize="characters"></label>
+            </div>
+            <div class="grid3">
+              <label>CQM / CAM até<input type="date" name="cqm_validade"></label>
+              <label>Cartão tacógrafo até<input type="date" name="tacografo_validade"></label>
+              <label>Exame médico até<input type="date" name="exame_medico_validade"></label>
+            </div>
+            <p class="ajuda">A pessoa, o RH e a logística são avisados 60, 30 e 7 dias antes de terminar.</p>
+          </details>
           <div id="blocoSenhaInicial">
             <label>Palavra-passe inicial (para a 1.ª entrada)<input type="text" name="senha_inicial" minlength="6" autocomplete="off" autocapitalize="off" placeholder="mínimo 6 caracteres"></label>
             <p class="ajuda">🔑 Com palavra-passe, a conta fica criada já: dê à pessoa o <b>email</b> e esta <b>palavra-passe</b>.

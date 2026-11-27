@@ -50,6 +50,7 @@ const limpo = (r) => Object.fromEntries(Object.entries(r).filter(([k, v]) => k[0
 const erroDeRede = (e) => !e?.code || /fetch|network|load failed/i.test(e.message || '');
 // "2026-11-25T22:10:00.123456+00:00" → Date (o Safari não lê 6 casas decimais)
 const lerData = (s) => new Date(String(s).replace(/(\.\d{3})\d+/, '$1'));
+const DIAS_SEMANA_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const iniciais = (n) => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 
 // Feriados nacionais de Portugal (fixos + Sexta-feira Santa e Corpo de Deus).
@@ -80,6 +81,18 @@ function diasUteis(ini, fim) {
   return n;
 }
 const sobrepoe = (a, b) => a.inicio <= b.fim && b.inicio <= a.fim;
+
+// Documentos de condução de cada pessoa
+const DOCS_PESSOA = [['carta_validade', 'Carta de condução'], ['cqm_validade', 'CQM / CAM'], ['tacografo_validade', 'Cartão de tacógrafo'], ['exame_medico_validade', 'Exame médico']];
+function estadoDocsPessoa(m, limite = 60) {
+  const hoje = new Date(hojeISO() + 'T00:00:00');
+  return DOCS_PESSOA.filter(([k]) => m?.[k]).map(([k, nome]) => {
+    const dias = Math.round((new Date(String(m[k]).slice(0, 10) + 'T00:00:00') - hoje) / 864e5);
+    const cls = dias < 0 ? 'mau' : dias <= 30 ? 'medio' : 'ok';
+    const txt = dias < 0 ? `${nome} expirou` : dias === 0 ? `${nome} termina hoje` : dias <= limite ? `${nome} termina em ${dias} dia${dias === 1 ? '' : 's'}` : `${nome} até ${dataPT(String(m[k]).slice(0, 10))}`;
+    return { campo: k, nome, dias, cls, txt, alerta: dias <= limite };
+  });
+}
 
 // Telemóvel: aceita "912 345 678", "+351 912345678", números estrangeiros…
 const soDigitos = (t) => String(t || '').replace(/[\s().-]/g, '');
@@ -124,6 +137,7 @@ const Equipa = {
     return (this.papeis[this.eu.papel] || []).includes(p);
   },
   meu(r) { return !r?._por || r._por === this.user?.id; },
+  meuTurno(t) { return !!t && (t.userId === this.user?.id || (!!this.eu && t.membroId === this.eu.id)); },
   podeEditar(tipo, r) {
     if (!this.empresa) return true;
     const meu = this.meu(r);
@@ -432,6 +446,11 @@ const Equipa = {
       dias_ferias: Math.max(0, Math.min(60, Math.round(N(f.dias_ferias || 22)))), data_entrada: f.data_entrada || null,
       data_nascimento: f.data_nascimento, contacto_emergencia: (f.contacto_emergencia || '').trim() || null,
     };
+    // Documentos de condução (só se o Supabase já tiver estes campos — equipa-4.sql)
+    if (this.membros.some((x) => 'carta_validade' in x)) {
+      DOCS_PESSOA.forEach(([k]) => { registo[k] = f[k] || null; });
+      registo.carta_categorias = (f.carta_categorias || '').trim().toUpperCase() || null;
+    }
     const q = editId
       ? this.cli().from('membros').update(registo).eq('id', editId)
       : this.cli().from('membros').insert({ ...registo, empresa_id: this.empresa.id });
@@ -474,6 +493,20 @@ const Equipa = {
     }
   },
   perfilCompleto(m = this.eu) { return !!(m?.telefone && m?.data_nascimento); },
+  async guardarMeusDocs(f) {
+    const { error } = await this.cli().rpc('atualizar_meus_documentos', {
+      p_carta: f.carta_validade || null, p_categorias: (f.carta_categorias || '').trim().toUpperCase(), p_cqm: f.cqm_validade || null,
+      p_tacografo: f.tacografo_validade || null, p_exame: f.exame_medico_validade || null,
+    });
+    if (error) {
+      aviso(erroDeRede(error) ? '❌ Precisa de internet para guardar.' : /function|schema/i.test(error.message) ? '❌ Falta correr o ficheiro equipa-4.sql no Supabase.' : '❌ ' + error.message);
+      return;
+    }
+    await this.carregarEquipa();
+    $('#detMeusDocs').open = false;
+    this.desenhar(); desenharAvisos();
+    aviso('🪪 Documentos guardados');
+  },
   async guardarMeuPerfil(f) {
     if (!telValido(f.telefone)) { aviso('❌ O telemóvel não parece certo (ex: 912 345 678).'); return; }
     const anos = idade(f.data_nascimento);
@@ -623,6 +656,13 @@ const Equipa = {
           sub: 'Telemóvel e data de nascimento', ir: 'equipa', foco: 'listaPessoas' });
       }
     }
+    // 🪪 Documentos de condução: a própria pessoa (60 dias) e quem gere pessoas/escalas (30 dias)
+    if (this.eu) estadoDocsPessoa(this.eu, 60).filter((d) => d.alerta).forEach((d) => out.push({
+      cls: d.dias < 0 ? 'mau' : 'medio', icone: '🪪', txt: d.txt, sub: 'Os seus documentos · trate da renovação', ir: 'equipa', foco: 'detMeusDocs' }));
+    if (this.pode('pessoas_gerir') || this.pode('escalas_gerir')) {
+      this.membros.filter((m) => m.user_id !== this.user.id).forEach((m) => estadoDocsPessoa(m, 30).filter((d) => d.alerta)
+        .forEach((d) => out.push({ cls: d.dias < 0 ? 'mau' : 'medio', icone: '🪪', txt: `${m.nome}: ${d.txt.charAt(0).toLowerCase() + d.txt.slice(1)}`, sub: 'Documentos de condução', ir: 'equipa', foco: 'listaPessoas' })));
+    }
     // 🎂 Aniversários (1 dia antes e no próprio dia) e anos de casa
     if (this.pode('avisos_aniversarios')) {
       this.membros.filter((m) => m.user_id !== this.user.id).forEach((m) => {
@@ -656,7 +696,7 @@ const Equipa = {
     // Os meus turnos de hoje e amanhã
     const hojeT = hojeISO();
     const amanhaT = (() => { const d = new Date(hojeT + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
-    (dados.escalas || []).filter((t) => t.userId === this.user.id && (t.data === hojeT || t.data === amanhaT))
+    (dados.escalas || []).filter((t) => this.meuTurno(t) && (t.data === hojeT || t.data === amanhaT))
       .sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio))
       .forEach((t) => out.push({ cls: 'ok', icone: '📅', ir: 'equipa', foco: 'listaEscalas',
         txt: `${t.data === hojeT ? 'Hoje' : 'Amanhã'}: turno das ${t.inicio} às ${t.fim}`,
@@ -696,7 +736,7 @@ const Equipa = {
     const saud = $('#saudacao');
     saud.hidden = !ok;
     let numEquipa = 0;
-    if (!ok) { $('#numEquipa').hidden = true; return; }
+    if (!ok) { $('#numEquipa').hidden = true; $('#painelBlocos').innerHTML = ''; return; }
 
     saud.innerHTML = `<span class="avatar">${esc(iniciais(this.eu?.nome))}</span><div><b>Olá, ${esc((this.eu?.nome || '').split(' ')[0])} 👋</b>
       <small>${esc(PAPEIS[this.eu?.papel] || '')} · ${esc(this.empresa.nome || '')}</small></div>`;
@@ -710,6 +750,18 @@ const Equipa = {
       fp.elements.contacto_emergencia.value = this.eu?.contacto_emergencia || '';
     }
     if (!completo && !this._perfilAberto) { $('#detMeuPerfil').open = true; this._perfilAberto = true; }
+    const temCampos = 'carta_validade' in (this.eu || {});
+    $('#detMeusDocs').hidden = !temCampos;
+    if (temCampos) {
+      const fd = $('#formMeusDocs');
+      if (!fd.contains(document.activeElement)) {
+        DOCS_PESSOA.forEach(([k]) => { fd.elements[k].value = this.eu[k] ? String(this.eu[k]).slice(0, 10) : ''; });
+        fd.elements.carta_categorias.value = this.eu.carta_categorias || '';
+      }
+      const ds = estadoDocsPessoa(this.eu);
+      $('#docsEstado').innerHTML = !ds.length ? '<span class="badge neutro">por preencher</span>'
+        : ds.some((d) => d.dias < 0) ? '<span class="badge mau">expirado</span>' : ds.some((d) => d.alerta) ? '<span class="badge medio">a terminar</span>' : '<span class="badge ok">✓ em dia</span>';
+    }
 
     this.desenharPainelPessoal();
     this.desenharOcorrencias();
@@ -723,24 +775,153 @@ const Equipa = {
     $('#numEquipa').textContent = numEquipa > 9 ? '9+' : numEquipa;
   },
 
+  // Painel à medida de cada pessoa: hoje, a minha carrinha, a frota, a equipa (RH)…
   desenharPainelPessoal() {
-    if (this.pode('financeiro')) return;
-    const vs = dados.viagens.filter((v) => noPeriodo(v.data) && (this.pode('viagens_ver_todas') || this.meu(v)));
-    const km = vs.reduce((s, v) => s + N(v.kmCarregado) + N(v.kmVazio), 0);
+    const hoje = hojeISO(), eu = this.user.id, fin = this.pode('financeiro');
+    const amanha = (() => { const d = new Date(hoje + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+    const daquiA = (n) => { const d = new Date(hoje + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const escalas = dados.escalas || [];
+    const vanDe = (id) => dados.carrinhas.find((c) => c.id === id);
+    const placa = (c) => (c ? `<span class="placa mini"><i>P</i><span>${esc(c.matricula)}</span></span>` : '');
+    const linha = (a, b = '', sub = '') => `<div class="l"><span>${a}${sub ? `<small>${sub}</small>` : ''}</span><b>${b}</b></div>`;
+    const bloco = (titulo, corpo, botao = '', cls = '') => `<div class="bloco ${cls}"><h3><span>${titulo}</span>${botao}</h3>${corpo}</div>`;
+    const ir = (aba, foco, txt) => `<button type="button" class="mini" data-ir="${aba}" ${foco ? `data-foco="${foco}"` : ''}>${txt}</button>`;
+    const fazViagens = this.pode('viagens_registar') || this.pode('abastecimentos_registar');
+    const logistica = this.pode('viagens_ver_todas') || this.pode('carrinhas_gerir') || this.pode('escalas_gerir') || this.gereProblemas();
+    const rh = this.pode('pessoas_gerir') || this.pode('ferias_aprovar') || this.pode('salarios');
+    const ausentesHoje = dados.ferias.filter((f) => f.estado === 'Aprovado' && f.inicio <= hoje && f.fim >= hoje);
+    const problemasAbertos = dados.ocorrencias.filter((o) => o.estado !== 'Resolvido');
+    const meusTurnos = escalas.filter((t) => this.meuTurno(t) && t.data >= hoje).sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio));
+    const turnosHoje = escalas.filter((t) => t.data === hoje).sort((a, b) => a.inicio.localeCompare(b.inicio));
+    const vsMes = dados.viagens.filter((v) => noPeriodo(v.data));
+    const minhasMes = vsMes.filter((v) => this.meu(v));
     const sf = this.saldoFerias();
-    const problemas = dados.ocorrencias.filter((o) => o.estado !== 'Resolvido' && (this.gereProblemas() || this.meu(o))).length;
-    const fazViagens = this.pode('viagens_registar') || this.pode('viagens_ver_todas');
-    const hoje = hojeISO();
-    const ausentes = dados.ferias.filter((f) => f.estado === 'Aprovado' && f.inicio <= hoje && f.fim >= hoje).length;
-    const porAprovar = dados.ferias.filter((f) => f.estado === 'Pendente').length;
-    $('#cartoesPessoais').innerHTML = (fazViagens ? `
-      <div class="cartao"><small>${this.pode('viagens_ver_todas') ? 'Viagens' : 'As minhas viagens'}</small><strong>${vs.length}</strong></div>
-      <div class="cartao"><small>Km no período</small><strong>${num(km)}</strong></div>` : `
-      <div class="cartao"><small>Na equipa</small><strong>${this.membros.length} pessoas</strong></div>
-      ${this.pode('ferias_aprovar') ? `<div class="cartao ${porAprovar ? 'vermelho' : ''}"><small>Férias por aprovar</small><strong>${porAprovar}</strong></div>`
-        : `<div class="cartao"><small>Ausentes hoje</small><strong>${ausentes}</strong></div>`}`) + `
-      <div class="cartao destaque"><small>Férias restam</small><strong class="positivo">${sf.restam} dias</strong></div>
-      ${problemas ? `<div class="cartao vermelho"><small>Problemas abertos</small><strong>${problemas}</strong></div>` : ''}`;
+    const quando = (d) => (d === hoje ? 'Hoje' : d === amanha ? 'Amanhã' : `${DIAS_SEMANA_CURTO[new Date(d + 'T00:00:00').getDay()]} ${dataPT(d).slice(0, 5)}`);
+
+    // ---- Cartões do topo (quem não vê finanças) ----
+    if (!fin) {
+      let cartoes;
+      if (fazViagens && !this.pode('viagens_ver_todas')) {
+        const t = meusTurnos[0];
+        cartoes = [
+          ['Próximo turno', t ? `${quando(t.data)} ${t.inicio}` : '—', ''],
+          ['Km este mês', num(minhasMes.reduce((s, v) => s + N(v.kmCarregado) + N(v.kmVazio), 0)), ''],
+          ['Férias restam', `${sf.restam} dias`, 'destaque'],
+        ];
+      } else if (logistica) {
+        const comVan = new Set(turnosHoje.map((t) => t.carrinhaId).filter(Boolean)).size;
+        cartoes = [
+          ['Carrinhas hoje', `${comVan} / ${dados.carrinhas.length}`, ''],
+          ['Problemas abertos', problemasAbertos.length, problemasAbertos.length ? 'vermelho' : ''],
+          ['Viagens no mês', vsMes.length, 'destaque'],
+        ];
+      } else if (rh) {
+        const anivMes = this.membros.filter((m) => m.data_nascimento && String(m.data_nascimento).slice(5, 7) === hoje.slice(5, 7)).length;
+        cartoes = [
+          ['Na equipa', `${this.membros.length} pessoas`, ''],
+          this.pode('ferias_aprovar') ? ['Férias por aprovar', dados.ferias.filter((f) => f.estado === 'Pendente').length, ''] : ['Ausentes hoje', ausentesHoje.length, ''],
+          ['Aniversários este mês', anivMes, 'destaque'],
+        ];
+      } else {
+        cartoes = [['Viagens no mês', vsMes.length, ''], ['Clientes', (dados.clientes || []).length, ''], ['Férias restam', `${sf.restam} dias`, 'destaque']];
+      }
+      $('#cartoesPessoais').innerHTML = cartoes.map(([t, v, c]) => `<div class="cartao ${c}"><small>${t}</small><strong${c === 'destaque' ? ' class="positivo"' : ''}>${v}</strong></div>`).join('');
+    }
+
+    const blocos = [];
+    // ---- Hoje (toda a gente) ----
+    const hojeLinhas = [];
+    meusTurnos.filter((t) => t.data === hoje || t.data === amanha).forEach((t) => hojeLinhas.push(linha(`📅 ${t.data === hoje ? 'Hoje' : 'Amanhã'} tem turno`, `${t.inicio}–${t.fim}`, [vanDe(t.carrinhaId)?.matricula, t.notas].filter(Boolean).map(esc).join(' · '))));
+    if (ausentesHoje.length) hojeLinhas.push(linha('🏖️ Ausentes hoje', '', esc([...new Set(ausentesHoje.map((f) => this.nomeDe(f._por)))].join(', '))));
+    this.membros.filter((m) => m.data_nascimento && String(m.data_nascimento).slice(5, 10) === hoje.slice(5)).forEach((m) => hojeLinhas.push(linha(`🎂 Hoje faz anos: ${esc(m.nome)}`, '')));
+    const minhaFeria = dados.ferias.filter((f) => this.meu(f) && ['Pendente', 'Aprovado'].includes(f.estado) && f.fim >= hoje).sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
+    if (minhaFeria) hojeLinhas.push(linha(`🏖️ As minhas ${minhaFeria.tipo.toLowerCase()}`, minhaFeria.estado === 'Pendente' ? '⏳ à espera' : '✓ aprovadas', `${dataPT(minhaFeria.inicio)} → ${dataPT(minhaFeria.fim)}`));
+    blocos.push(bloco(`☀️ Hoje · ${DIAS_SEMANA_CURTO[new Date(hoje + 'T00:00:00').getDay()]} ${dataPT(hoje).slice(0, 5)}`, hojeLinhas.join('') || '<div class="vazio-mini">Nada marcado para hoje.</div>',
+      escalas.length ? ir('equipa', 'listaEscalas', 'Escala ›') : '', 'destaque-bloco'));
+
+    // ---- A minha carrinha (quem conduz) ----
+    if (fazViagens && !fin) {
+      const turnoHoje = meusTurnos.find((t) => t.data === hoje) || meusTurnos[0];
+      const ultV = dados.viagens.filter((v) => this.meu(v) && v.carrinhaId).sort(porDataDesc)[0];
+      const ultA = dados.abastecimentos.filter((a) => this.meu(a)).sort(porDataDesc)[0];
+      const van = vanDe(turnoHoje?.carrinhaId || ultV?.carrinhaId || ultA?.carrinhaId);
+      if (van) {
+        const km = kmAtual(van.id);
+        const docs = estadoDocs(van);
+        const probs = problemasAbertos.filter((o) => o.carrinhaId === van.id);
+        blocos.push(bloco(`🚐 A minha carrinha ${placa(van)}`,
+          linha(esc(van.modelo || 'Carrinha'), km != null ? num(km) + ' km' : '') +
+          (docs.length ? `<div class="l"><span>${docs.map((d) => `<span class="badge ${d.cls}">${esc(d.txt)}</span>`).join(' ')}</span></div>` : '') +
+          (probs.length ? probs.map((o) => linha(`${o.urgencia === 'alta' ? '🔴' : '🔧'} ${esc(o.tipo)}`, esc(o.estado), esc(o.descricao))).join('') : linha('✅ Sem problemas reportados', '')),
+          ir('equipa', 'formOcorrencias', '⚠️ Reportar')));
+      }
+      const minhas = dados.viagens.filter((v) => this.meu(v)).sort(porDataDesc).slice(0, 3);
+      blocos.push(bloco('🚚 As minhas últimas viagens', minhas.length ? minhas.map((v) => linha(`${esc(v.origem || '?')} → ${esc(v.destino || '?')}`, `${num(N(v.kmCarregado) + N(v.kmVazio))} km`, `${dataPT(v.data)}${v.cliente ? ' · ' + esc(v.cliente) : ''}`)).join('')
+        : '<div class="vazio-mini">Ainda não registou viagens.</div>', this.pode('viagens_registar') ? ir('viagens', 'formViagens', '+ Viagem') : ''));
+    }
+
+    // ---- Logística: escala do dia e frota ----
+    if (logistica) {
+      blocos.push(bloco('🗓️ Escala de hoje', turnosHoje.length ? turnosHoje.map((t) => linha(`${esc(Escalas.nome(t))}`, `${t.inicio}–${t.fim}`, [vanDe(t.carrinhaId)?.matricula, t.notas].filter(Boolean).map(esc).join(' · '))).join('')
+        : '<div class="vazio-mini">Sem turnos marcados para hoje.</div>', ir('equipa', 'listaEscalas', 'Escalas ›')));
+      if (dados.carrinhas.length) {
+        blocos.push(bloco('🚐 Estado da frota', dados.carrinhas.map((c) => {
+          const probs = problemasAbertos.filter((o) => o.carrinhaId === c.id);
+          const docs = estadoDocs(c).filter((d) => d.alerta);
+          const com = turnosHoje.find((t) => t.carrinhaId === c.id);
+          const [cor, estado] = probs.some((o) => o.urgencia === 'alta') ? ['🔴', 'Parada'] : probs.length ? ['🟠', `${probs.length} problema${probs.length > 1 ? 's' : ''}`]
+            : docs.length ? ['🟡', docs[0].txt] : ['🟢', 'Operacional'];
+          const km = kmAtual(c.id);
+          return `<div class="van-estado"><span class="semaforo">${cor}</span><div class="info">${placa(c)} <b>${esc(estado)}</b>
+            <small>${[c.modelo, km != null ? num(km) + ' km' : '', com ? `hoje: ${Escalas.nome(com)} ${com.inicio}–${com.fim}` : 'sem turno hoje'].filter(Boolean).map(esc).join(' · ')}</small></div></div>`;
+        }).join(''), this.gereProblemas() ? ir('equipa', 'listaOcorrencias', 'Problemas ›') : ''));
+      }
+      if (this.pode('precos') && !fin) {
+        const fat = vsMes.reduce((s, v) => s + N(v.receita), 0), cobrar = vsMes.reduce((s, v) => s + porCobrarViagem(v), 0);
+        const porCli = {};
+        vsMes.forEach((v) => { if (v.cliente) porCli[v.cliente] = (porCli[v.cliente] || 0) + N(v.receita); });
+        const top = Object.entries(porCli).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        blocos.push(bloco(`💶 ${mes ? MESES[Number(mes.slice(5, 7)) - 1] : 'Total'}`, linha('Faturado', euro(fat), `${vsMes.length} viagens · ${num(vsMes.reduce((s, v) => s + N(v.kmCarregado) + N(v.kmVazio), 0))} km`) +
+          linha('Por cobrar', `<span class="${cobrar ? 'negativo' : ''}">${euro(cobrar)}</span>`) + top.map(([n, v], i) => linha(`${['🥇', '🥈', '🥉'][i]} ${esc(n)}`, euro(v))).join('')));
+      }
+    }
+
+    // ---- RH: aniversários, ausências, salários, documentos, dados em falta ----
+    if (rh && !fin) {
+      const aniv = this.membros.map((m) => ({ m, p: proximoAniversario(m.data_nascimento) })).filter((x) => x.p && x.p.dias <= 30).sort((a, b) => a.p.dias - b.p.dias);
+      blocos.push(bloco('🎂 Aniversários (próximos 30 dias)', aniv.length ? aniv.map(({ m, p }) => linha(esc(m.nome), p.dias === 0 ? '🎉 hoje' : p.dias === 1 ? 'amanhã' : `daqui a ${p.dias} dias`, `${diaMes(String(m.data_nascimento))} · faz ${p.anos} anos`)).join('')
+        : '<div class="vazio-mini">Nenhum nos próximos 30 dias.</div>'));
+      const semana = dados.ferias.filter((f) => f.estado === 'Aprovado' && f.inicio <= daquiA(7) && f.fim >= hoje).sort((a, b) => a.inicio.localeCompare(b.inicio));
+      const pend = dados.ferias.filter((f) => f.estado === 'Pendente');
+      blocos.push(bloco('🏖️ Ausências esta semana', (semana.length ? semana.map((f) => linha(esc(this.nomeDe(f._por)), esc(f.tipo), `${dataPT(f.inicio)} → ${dataPT(f.fim)}`)).join('') : '<div class="vazio-mini">Ninguém ausente esta semana.</div>') +
+        (this.pode('ferias_aprovar') && pend.length ? linha(`⏳ ${pend.length} pedido${pend.length > 1 ? 's' : ''} por aprovar`, '') : ''), ir('equipa', this.pode('ferias_aprovar') && pend.length ? 'listaAprovar' : 'listaAusencias', 'Férias ›')));
+      if (this.pode('salarios') && typeof Salarios !== 'undefined') {
+        const m = Salarios.mesAtual(), procs = dados.processamentos.filter((p) => p.mes === m), q = Salarios.param();
+        const cont = (e) => procs.filter((p) => p.estado === e).length;
+        const liq = procs.reduce((s, p) => s + Salarios.valores(p).liquido, 0), custo = procs.reduce((s, p) => s + Salarios.valores(p).custo, 0);
+        const mm = Number(m.slice(5, 7));
+        const prox = [[Number(q.mesSubFerias), 'férias'], [Number(q.mesSubNatal), 'Natal']].map(([mes2, n]) => ({ n, faltam: (mes2 - mm + 12) % 12 })).sort((a, b) => a.faltam - b.faltam)[0];
+        blocos.push(bloco(`💶 Salários de ${MESES[mm - 1]}`, (procs.length
+          ? linha('A pagar', euro(liq), `${cont('Rascunho')} por fechar · ${cont('Fechado')} fechados · ${cont('Pago')} pagos`) + linha('Custo para a empresa', euro(custo))
+          : linha('⚙️ Mês ainda não preparado', '', `${Salarios.fichas().length} fichas`)) +
+          linha('Próximo subsídio', prox.faltam === 0 ? `de ${prox.n} este mês` : `de ${prox.n} daqui a ${prox.faltam} ${prox.faltam === 1 ? 'mês' : 'meses'}`),
+          ir('equipa', 'tabelaSalarios', 'Folha ›')));
+      }
+      const docs = this.membros.flatMap((m) => estadoDocsPessoa(m, 60).filter((d) => d.alerta).map((d) => ({ m, d }))).sort((a, b) => a.d.dias - b.d.dias);
+      const faltam = this.membros.filter((m) => !this.perfilCompleto(m));
+      if (docs.length || faltam.length) {
+        blocos.push(bloco('📋 Por tratar', docs.map(({ m, d }) => linha(`🪪 ${esc(m.nome)}`, `<span class="badge ${d.cls}">${esc(d.dias < 0 ? 'expirou' : d.dias + ' dias')}</span>`, esc(d.nome))).join('') +
+          faltam.map((m) => linha(`👤 ${esc(m.nome)}`, '', 'Falta telemóvel ou data de nascimento')).join(''), ir('equipa', 'listaPessoas', 'Pessoas ›')));
+      }
+    }
+
+    // ---- O meu último recibo ----
+    const rec = (dados.processamentos || []).filter((p) => p.userId === eu && ['Fechado', 'Pago'].includes(p.estado)).sort((a, b) => b.mes.localeCompare(a.mes))[0];
+    if (rec && typeof Salarios !== 'undefined') {
+      blocos.push(bloco('🧾 O meu último recibo', linha(`${MESES[Number(rec.mes.slice(5, 7)) - 1]} ${rec.mes.slice(0, 4)}`, euro(Salarios.valores(rec).liquido), rec.estado === 'Pago' ? '✓ pago' : 'por pagar'),
+        ir('equipa', 'listaRecibos', 'Recibos ›')));
+    }
+    $('#painelBlocos').innerHTML = blocos.join('');
   },
 
   desenharOcorrencias() {
@@ -828,6 +1009,7 @@ const Equipa = {
             ${m.user_id ? '' : '<span class="badge medio">Convite por aceitar</span>'}</div>
           <div class="sub">${esc(m.email)}${m.data_nascimento ? ` · 🎂 ${diaMes(m.data_nascimento)}${gere ? ` (${idade(m.data_nascimento)} anos)` : ''}` : ''}</div>
           ${gere && m.contacto_emergencia ? `<div class="sub">🆘 Emergência: ${esc(m.contacto_emergencia)}</div>` : ''}
+          ${(gere || this.pode('escalas_gerir') || m.user_id === this.user.id) && estadoDocsPessoa(m).length ? `<div class="sub">🪪 ${m.carta_categorias ? 'Carta ' + esc(m.carta_categorias) + ' · ' : ''}${estadoDocsPessoa(m).map((d) => `<span class="badge ${d.cls}">${esc(d.txt)}</span>`).join(' ')}</div>` : ''}
           ${gere && m.user_id ? `<div class="sub">🏖️ ${sf.restam} de ${m.dias_ferias} dias de férias por gozar</div>` : ''}
           ${gere && !this.perfilCompleto(m) ? `<div class="sub"><span class="badge medio">⚠️ Falta: ${[!m.telefone && 'telemóvel', !m.data_nascimento && 'data de nascimento'].filter(Boolean).join(' e ')}</span></div>` : ''}
           ${m.telefone && m.user_id !== this.user.id ? `<div class="botoes mini-botoes">
@@ -938,6 +1120,10 @@ $('#listaPermissoes').addEventListener('change', (e) => {
   if (c) Equipa.mudarPermissao($('#selPapelPermissoes').value, c.dataset.permChave, c.checked);
 });
 
+$('#formMeusDocs').addEventListener('submit', (e) => {
+  e.preventDefault();
+  Equipa.guardarMeusDocs(Object.fromEntries(new FormData(e.target)));
+});
 $('#formMeuPerfil').addEventListener('submit', (e) => {
   e.preventDefault();
   Equipa.guardarMeuPerfil(Object.fromEntries(new FormData(e.target)));
@@ -968,7 +1154,8 @@ document.addEventListener('click', (e) => {
     const m = Equipa.membros.find((x) => x.id === d.pessoaEditar);
     const form = $('#formPessoas');
     if (!m) return;
-    ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada', 'data_nascimento', 'contacto_emergencia'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
+    ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada', 'data_nascimento', 'contacto_emergencia',
+      'carta_validade', 'carta_categorias', 'cqm_validade', 'tacografo_validade', 'exame_medico_validade'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
     form.dataset.editId = m.id;
     $('#blocoSenhaInicial').hidden = !!m.user_id;
     form.querySelector('.tituloForm').textContent = '✏️ A editar ' + m.nome;

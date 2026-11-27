@@ -81,3 +81,9 @@ seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
 - Requer a versão nova de `supabase/functions/notificar/index.ts` publicada no Supabase.
 - **Mandar alguém embora:** Equipa → Pessoas → 🗑️ → escolher "só tirar da equipa" ou "apagar também a conta".
   Apagar a conta (pela Edge Function) remove o email/palavra-passe no Supabase e as notificações; o trabalho feito fica guardado.
+
+## 🧭 Painel por papel e documentos do condutor (atualização 4)
+Correr `supabase/equipa-4.sql` no Supabase (uma vez) e voltar a publicar a função (Edge Functions → notificar → Code → colar `supabase/functions/notificar/index.ts` → Deploy, com "Verify JWT" desligado).
+- **Painel** mostra o que interessa a cada papel: condutor (turno de hoje, a sua carrinha, últimas viagens), logística (escala do dia, estado da frota), RH (aniversários, ausências, salários do mês, documentos a tratar), patrão/contabilidade (tudo + finanças).
+- **Documentos do condutor**: validade da carta (e categorias), CQM/CAM, cartão de tacógrafo e exame médico. Preenche-se em Equipa → Pessoas ("Documentos de condução") ou pelo próprio em Equipa → "🪪 Os meus documentos".
+- Avisos no site e notificação diária aos 60, 30 e 7 dias, no dia e depois de expirar; a escala avisa se o condutor tem a carta expirada.
