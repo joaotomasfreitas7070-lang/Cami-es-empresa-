@@ -124,7 +124,7 @@
 
       <div id="painelBlocos" class="painel-blocos"></div>
 
-      <div data-perm="financeiro">
+      <div data-perm="financeiro" class="painel-fin">
       <div class="cartoes">
         <div class="cartao verde"><small>Receita</small><strong id="totReceita">0 €</strong></div>
         <div class="cartao vermelho"><small>Gastos</small><strong id="totGastos">0 €</strong></div>
@@ -137,8 +137,10 @@
         <div class="cartao"><small>€ / km carregado</small><strong id="totPrecoKm">—</strong></div>
       </div>
 
+      <div class="pf-resultado">
       <h2>Resultado <span id="tituloPeriodo"></span></h2>
       <div id="resultado" class="resultado"></div>
+      </div>
 
       <div id="blocoSemanas">
         <h2>Por semana</h2>
@@ -150,16 +152,20 @@
         <div id="listaPainel" class="lista"></div>
       </div>
 
-      <div class="botoes espaco">
+      <div class="botoes espaco pf-botoes">
         <button type="button" id="btnRelatorio">📄 Relatório do mês (PDF) para o contabilista</button>
       </div>
 
+      <div class="pf-meses">
       <h2>Todos os meses</h2>
       <p class="ajuda">Toque num mês para o abrir.</p>
       <div class="tabela-wrap"><table class="tabela clicavel" id="tabelaMeses"></table></div>
+      </div>
 
+      <div class="pf-dinheiro">
       <h2>Para onde vai o dinheiro</h2>
       <div id="categoriasPainel" class="barras"></div>
+      </div>
       </div>
     </section>
 

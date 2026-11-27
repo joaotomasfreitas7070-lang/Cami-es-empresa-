@@ -479,3 +479,50 @@ details.docs-conducao summary { cursor: pointer; font-weight: 700; padding: 8px 
 .item.guia.pronta { border-left: 4px solid #22c55e; }
 .num-mini { background: #e11d2e; color: #fff; border-radius: 9px; padding: 0 6px; font-size: .72rem; margin-left: 4px; }
 .l.alerta-guia b, .l.alerta-guia span { color: #ef4444; }
+
+/* ============ Computador (ecrãs largos): menu à esquerda e mais colunas ============ */
+@media (min-width: 1100px) {
+  body { padding-bottom: 24px; }
+  .abas {
+    top: 0; bottom: 0; right: auto; width: 220px; flex-direction: column; gap: 4px;
+    padding: 18px 12px; border-top: 0; border-right: 1px solid #22262d;
+  }
+  .abas::before { content: "MENU"; color: #59606b; font-size: .7rem; font-weight: 800; letter-spacing: .14em; padding: 4px 12px 10px; }
+  .abas button { flex: none; flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; }
+  .abas button span { font-size: .95rem; }
+  .abas button:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+  .abas button.ativa { background: rgba(225, 29, 46, .14); }
+  .abas button.ativa::before { top: 10px; bottom: 10px; left: 0; right: auto; width: 3px; height: auto; border-radius: 0 3px 3px 0; }
+  .num-aba { top: 50%; left: auto; right: 12px; transform: translateY(-50%); }
+  .topo { margin-left: 220px; padding-left: 32px; padding-right: 32px; }
+  .marca, .mes { max-width: 1240px; }
+  main { margin-left: 220px; max-width: none; padding: 10px 32px 32px; }
+  main > .aba { max-width: 1240px; margin: 0 auto; }
+  .aviso { bottom: 28px; left: calc(50% + 110px); }
+
+  /* Painel em duas colunas */
+  .avisos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .painel-blocos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .painel-blocos > .destaque-bloco { grid-column: 1 / -1; }
+  .painel-fin { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; align-items: start; }
+  .painel-fin > * { min-width: 0; }
+  .painel-fin > .cartoes, .painel-fin > .pf-botoes { grid-column: 1 / -1; }
+  .painel-fin > .cartoes:first-child { grid-template-columns: repeat(3, 1fr); }
+  .painel-fin > .pf-resultado { grid-column: 1; grid-row: span 2; }
+  .painel-fin > #blocoSemanas, .painel-fin > #blocoCarrinhas { grid-column: 2; }
+
+  /* Registar à esquerda, lista à direita */
+  #viagens [data-sub-painel="viagens"].ativo, #abastecer.ativa, #despesas.ativa {
+    display: grid; grid-template-columns: minmax(400px, 5fr) minmax(0, 6fr); column-gap: 28px; align-items: start;
+  }
+  #viagens [data-sub-painel="viagens"] > *, #abastecer > *, #despesas > * { grid-column: 2; }
+  #viagens [data-sub-painel="viagens"] > #formViagens, #abastecer > #formAbastecer, #despesas > #formDespesas {
+    grid-column: 1; grid-row: 1 / span 20; max-width: none; position: sticky; top: 150px;
+    max-height: calc(100vh - 170px); overflow-y: auto;
+  }
+  #viagens [data-sub-painel="viagens"] > h2, #abastecer > h2, #despesas > h2 { margin-top: 4px; }
+
+  /* Listas em duas colunas */
+  #listaPessoas, #listaOcorrencias, #listaGuias, #listaClientes, #listaCarrinhas, #listaRecibos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (min-width: 1100px) { .lista > .vazio { grid-column: 1 / -1; } }
