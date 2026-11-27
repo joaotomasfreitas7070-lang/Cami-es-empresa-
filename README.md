@@ -87,3 +87,6 @@ Correr `supabase/equipa-4.sql` no Supabase (uma vez) e voltar a publicar a funç
 - **Painel** mostra o que interessa a cada papel: condutor (turno de hoje, a sua carrinha, últimas viagens), logística (escala do dia, estado da frota), RH (aniversários, ausências, salários do mês, documentos a tratar), patrão/contabilidade (tudo + finanças).
 - **Documentos do condutor**: validade da carta (e categorias), CQM/CAM, cartão de tacógrafo e exame médico. Preenche-se em Equipa → Pessoas ("Documentos de condução") ou pelo próprio em Equipa → "🪪 Os meus documentos".
 - Avisos no site e notificação diária aos 60, 30 e 7 dias, no dia e depois de expirar; a escala avisa se o condutor tem a carta expirada.
+
+## 🏠 Casas das Obras (site à parte)
+Fotos semanais das casas das obras, com regras e avisos aos encarregados: ver [`obras/README.md`](obras/README.md).

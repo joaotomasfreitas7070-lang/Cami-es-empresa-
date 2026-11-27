@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Casas">
+  <meta name="theme-color" content="#c2410c">
+  <title>Casas das Obras</title>
+  <link rel="icon" type="image/png" href="img/icon-192.png">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topo" id="topo" hidden>
+    <div class="topo-in">
+      <div class="marca"><img src="img/icon-192.png" alt=""><span>Casas das Obras</span></div>
+      <button type="button" class="topo-eu" id="botaoConta" aria-label="A minha conta"></button>
+    </div>
+    <nav class="abas" id="abas" hidden></nav>
+  </header>
+
+  <main id="app" class="app"><p class="a-carregar">A carregar…</p></main>
+
+  <dialog id="janela" class="janela"><div id="janelaCorpo"></div></dialog>
+  <div id="visor" class="visor" hidden>
+    <button type="button" class="visor-fechar" aria-label="Fechar">✕</button>
+    <button type="button" class="visor-ant" aria-label="Anterior">‹</button>
+    <img alt="">
+    <button type="button" class="visor-seg" aria-label="Seguinte">›</button>
+    <p class="visor-legenda"></p>
+  </div>
+  <div id="aviso" class="aviso" role="status" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
