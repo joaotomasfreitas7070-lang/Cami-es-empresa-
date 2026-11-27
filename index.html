@@ -210,6 +210,16 @@
         <p class="ajuda" id="faturaInfo">Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.</p>
         </div>
         <label>Notas<input type="text" name="notas"></label>
+        <div class="caixa-anexos">
+          <div class="grid2">
+            <label>📎 Outros documentos
+              <select name="tipoDoc"><option>CMR</option><option>Contrato de transporte</option><option>Guia</option><option>Comprovativo de entrega</option><option>Outro</option></select>
+            </label>
+            <label>Ficheiros (PDF ou fotos)<input type="file" name="anexoFiles" accept="application/pdf,image/*" multiple></label>
+          </div>
+          <div id="anexosViagem" class="anexos"></div>
+          <p class="ajuda">Só desta carga: CMR, contrato de transporte, comprovativos… Pode juntar vários.</p>
+        </div>
 
         <div data-perm="precos">
         <div id="previewViagem" class="preview"></div>
@@ -356,8 +366,7 @@
               <label>Carta de condução válida até<input type="date" name="carta_validade"></label>
               <label>Categorias da carta<input type="text" name="carta_categorias" placeholder="ex: B, C" autocapitalize="characters"></label>
             </div>
-            <div class="grid3">
-              <label>CQM / CAM até<input type="date" name="cqm_validade"></label>
+            <div class="grid2">
               <label>Cartão tacógrafo até<input type="date" name="tacografo_validade"></label>
               <label>Exame médico até<input type="date" name="exame_medico_validade"></label>
             </div>
@@ -367,6 +376,7 @@
 
         <div class="subnav" data-subnav="equipa">
           <button type="button" class="chip" data-sub="problemas">⚠️ Problemas</button>
+          <button type="button" class="chip" data-sub="guias" data-perm="guias_pedir|guias_fazer|guias_ver_todas">📄 Guias <span class="num-mini" id="numGuias" hidden></span></button>
           <button type="button" class="chip" data-sub="ferias">🏖️ Férias</button>
           <button type="button" class="chip" data-sub="escalas">📅 Escalas</button>
           <button type="button" class="chip" data-sub="pessoas">👥 Pessoas</button>
@@ -410,6 +420,47 @@
           <button type="button" class="chip" data-f="todos">Todos</button>
         </div>
         <div id="listaOcorrencias" class="lista espaco"></div>
+        </div>
+
+        <div class="sub-painel" data-sub-painel="guias">
+        <h2>📄 Guias de transporte</h2>
+        <p class="ajuda guia-regra">⛔ O condutor só sai do local de carga <b>com a guia</b>. Peça-a aqui com antecedência: o RH faz a guia e ela aparece no telemóvel do condutor.</p>
+        <form id="formGuias" class="formulario" data-perm="guias_pedir|guias_fazer">
+          <h3 class="tituloForm" data-novo="Pedir guia (o que vai ser a carga)">Pedir guia (o que vai ser a carga)</h3>
+          <div class="grid2">
+            <label>Dia da carga<input type="date" name="data" required></label>
+            <label id="rotCondutorGuia">Condutor<select name="membroId" id="selCondutorGuia"></select></label>
+          </div>
+          <label>Carga<input type="text" name="carga" required placeholder="ex: 12 paletes de azulejo"></label>
+          <div class="grid2">
+            <label>Quantidade / peso<input type="text" name="quantidade" placeholder="ex: 3 500 kg"></label>
+            <label>Carrinha<select name="carrinhaId" class="selCarrinha semCarrinha"></select></label>
+          </div>
+          <div class="grid2">
+            <label>Local de carga<input type="text" name="origem" required placeholder="ex: Vila Real" list="sugLocais"></label>
+            <label>Destino<input type="text" name="destino" placeholder="ex: Lisboa" list="sugLocais"></label>
+          </div>
+          <div class="grid2">
+            <label>Cliente<input type="text" name="cliente" list="sugClientes"></label>
+            <label>Notas<input type="text" name="notas" placeholder="ex: carregar às 8h"></label>
+          </div>
+          <div class="caixa-rh" data-perm="guias_fazer">
+            <div class="grid2">
+              <label>Nº da guia<input type="text" name="numero"></label>
+              <label>Guia em PDF<input type="file" name="guiaFile" accept="application/pdf,image/*"></label>
+            </div>
+            <p class="ajuda" id="guiaInfo">Ao anexar o PDF, a guia fica pronta e o condutor e a logística são avisados.</p>
+          </div>
+          <button type="submit" class="principal">Enviar pedido</button>
+          <button type="button" class="cancelar" hidden>Cancelar edição</button>
+        </form>
+        <input type="file" id="inputGuiaPdf" accept="application/pdf,image/*" hidden>
+
+        <div class="filtros" id="filtroGuias">
+          <button type="button" class="chip ativo" data-f="ativas">Próximas e por fazer</button>
+          <button type="button" class="chip" data-f="todas">Todas</button>
+        </div>
+        <div id="listaGuias" class="lista espaco"></div>
         </div>
 
         <div class="sub-painel" data-sub-painel="ferias">
@@ -508,8 +559,7 @@
               <label>Carta de condução válida até<input type="date" name="carta_validade"></label>
               <label>Categorias da carta<input type="text" name="carta_categorias" placeholder="ex: B, C" autocapitalize="characters"></label>
             </div>
-            <div class="grid3">
-              <label>CQM / CAM até<input type="date" name="cqm_validade"></label>
+            <div class="grid2">
               <label>Cartão tacógrafo até<input type="date" name="tacografo_validade"></label>
               <label>Exame médico até<input type="date" name="exame_medico_validade"></label>
             </div>

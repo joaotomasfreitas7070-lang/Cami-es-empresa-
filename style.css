@@ -467,3 +467,15 @@ button.biometria { width: 100%; margin-top: 10px; }
 .semaforo { font-size: 1.1rem; }
 details.docs-conducao { margin-top: 12px; border: 1px dashed var(--borda); border-radius: 12px; padding: 4px 12px 10px; }
 details.docs-conducao summary { cursor: pointer; font-weight: 700; padding: 8px 0; color: var(--texto); }
+
+/* Guias e anexos */
+.guia-regra { border-left: 3px solid var(--vermelho, #e11d2e); padding-left: 10px; }
+.caixa-rh, .caixa-anexos { border: 1px dashed var(--borda, rgba(127,127,127,.35)); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.anexos { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.anexos:empty { display: none; }
+.anexos .anexo { display: inline-flex; align-items: center; gap: 4px; }
+.anexos .anexo button.tirar { background: none; border: 0; color: inherit; opacity: .7; padding: 0 2px; font-size: 1rem; }
+.item.guia.pedida { border-left: 4px solid #f59e0b; }
+.item.guia.pronta { border-left: 4px solid #22c55e; }
+.num-mini { background: #e11d2e; color: #fff; border-radius: 9px; padding: 0 6px; font-size: .72rem; margin-left: 4px; }
+.l.alerta-guia b, .l.alerta-guia span { color: #ef4444; }

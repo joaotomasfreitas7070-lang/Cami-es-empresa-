@@ -29,9 +29,12 @@ const PERMISSOES = [
   ['salarios', 'Ver e processar salários (fichas, recibos, mapa) — dados sensíveis'],
   ['clientes', 'Gerir a lista de clientes'],
   ['escalas_gerir', 'Fazer as escalas e turnos'],
+  ['guias_pedir', 'Pedir guias de transporte (dizer a carga)'],
+  ['guias_fazer', 'Fazer as guias de transporte (anexar o PDF)'],
+  ['guias_ver_todas', 'Ver as guias de todos os condutores'],
 ];
 const TIPOS_SYNC = ['carrinhas', 'viagens', 'abastecimentos', 'despesas', 'custosFixos', 'ferias', 'ocorrencias',
-  'salarios', 'processamentos', 'clientes', 'escalas'];
+  'salarios', 'processamentos', 'clientes', 'escalas', 'guias'];
 const URGENCIA = { baixa: ['ok', '🟢 Pode trabalhar'], media: ['medio', '🟠 Ver em breve'], alta: ['mau', '🔴 Parada'] };
 const ESTADO_OC = { Aberto: ['mau', 'Por resolver'], 'Em reparação': ['medio', '🔧 Em reparação'], Resolvido: ['ok', '✓ Resolvido'] };
 const ESTADO_FER = { Pendente: ['medio', '⏳ À espera'], Aprovado: ['ok', '✓ Aprovado'], Recusado: ['mau', '✕ Recusado'], Cancelado: ['neutro', 'Cancelado'] };
@@ -83,7 +86,7 @@ function diasUteis(ini, fim) {
 const sobrepoe = (a, b) => a.inicio <= b.fim && b.inicio <= a.fim;
 
 // Documentos de condução de cada pessoa
-const DOCS_PESSOA = [['carta_validade', 'Carta de condução'], ['cqm_validade', 'CQM / CAM'], ['tacografo_validade', 'Cartão de tacógrafo'], ['exame_medico_validade', 'Exame médico']];
+const DOCS_PESSOA = [['carta_validade', 'Carta de condução'], ['tacografo_validade', 'Cartão de tacógrafo'], ['exame_medico_validade', 'Exame médico']];
 function estadoDocsPessoa(m, limite = 60) {
   const hoje = new Date(hojeISO() + 'T00:00:00');
   return DOCS_PESSOA.filter(([k]) => m?.[k]).map(([k, nome]) => {
@@ -151,6 +154,7 @@ const Equipa = {
       case 'salarios': case 'processamentos': return this.pode('salarios');
       case 'clientes': return this.pode('clientes');
       case 'escalas': return this.pode('escalas_gerir');
+      case 'guias': return this.pode('guias_fazer') || ((meu || this.pode('guias_ver_todas')) && this.pode('guias_pedir') && (r?.estado || 'Pedida') === 'Pedida');
       default: return this.pode('financeiro');
     }
   },
@@ -436,6 +440,75 @@ const Equipa = {
     if (janela) janela.location.href = data.signedUrl; else location.href = data.signedUrl;
   },
 
+  /* ----- Guias de transporte ----- */
+  minhaGuia(g) { return !!g && (g.userId === this.user?.id || (!!this.eu && g.membroId === this.eu.id)); },
+  guiasVisiveis() {
+    const todas = this.pode('guias_fazer') || this.pode('guias_ver_todas');
+    return (dados.guias || []).filter((g) => todas || this.minhaGuia(g) || this.meu(g));
+  },
+  guiasPorFazer() { return (dados.guias || []).filter((g) => g.estado !== 'Pronta'); },
+  async enviarGuia(id, ficheiro, numero) {
+    if (!Nuvem.user || !ficheiro) return;
+    const ext = (ficheiro.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+    const caminho = `${this.pasta('guias')}/${id}-${Date.now()}.${ext}`;
+    aviso('📤 A enviar a guia…');
+    const { error } = await this.cli().storage.from('faturas').upload(caminho, ficheiro, { contentType: ficheiro.type || undefined, upsert: true });
+    if (error) { aviso('❌ A guia não foi enviada: ' + error.message); return; }
+    const g = dados.guias.find((x) => x.id === id);
+    if (!g) return;
+    const anterior = g.ficheiro;
+    Object.assign(g, { ficheiro: caminho, ficheiroNome: ficheiro.name, estado: 'Pronta', feitaPor: this.eu?.nome || '', feitaEm: hojeISO() });
+    if (numero != null && numero !== '') g.numero = numero;
+    guardar(); desenhar(); aviso('📄 Guia pronta — o condutor foi avisado');
+    if (anterior && anterior !== caminho) this.cli().storage.from('faturas').remove([anterior]);
+  },
+  // Guias pedidas antes de a pessoa ter conta: liga-as à conta assim que existir (para o condutor as ver)
+  ligarGuias() {
+    if (!this.pode('guias_fazer') && !this.pode('guias_ver_todas')) return false;
+    let mudou = false;
+    (dados.guias || []).forEach((g) => {
+      const m = this.membros.find((x) => x.id === g.membroId);
+      if (m?.user_id && g.userId !== m.user_id && g.data >= hojeISO() && this.podeEditar('guias', g)) { g.userId = m.user_id; mudou = true; }
+    });
+    return mudou;
+  },
+  desenharGuias() {
+    if (this.ligarGuias()) guardar();
+    const gere = this.pode('guias_fazer'), todas = gere || this.pode('guias_ver_todas');
+    // Escolher o condutor: só quem vê as guias de todos; os outros pedem para si
+    const sel = $('#selCondutorGuia'), atual = sel.value;
+    const pessoas = this.membros.filter((m) => m.papel === 'condutor' || m.carta_validade || m.id === this.eu?.id);
+    sel.innerHTML = pessoas.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('');
+    sel.value = atual && pessoas.some((m) => m.id === atual) ? atual : (this.eu?.papel === 'condutor' || !pessoas.length ? this.eu?.id || '' : pessoas.find((m) => m.papel === 'condutor')?.id || this.eu?.id || '');
+    $('#rotCondutorGuia').hidden = !todas;
+    const form = $('#formGuias');
+    form.querySelector('button[type=submit]').textContent = form.dataset.editId ? 'Guardar' : gere ? 'Guardar guia' : 'Enviar pedido';
+
+    const hoje = hojeISO();
+    let lista = this.guiasVisiveis().slice().sort((a, b) => (a.estado === 'Pronta') - (b.estado === 'Pronta') || a.data.localeCompare(b.data));
+    if (this.filtroGuias !== 'todas') lista = lista.filter((g) => g.estado !== 'Pronta' || g.data >= hoje);
+    else lista.sort((a, b) => b.data.localeCompare(a.data));
+    $$('#filtroGuias .chip').forEach((c) => c.classList.toggle('ativo', c.dataset.f === (this.filtroGuias || 'ativas')));
+    const n = gere ? this.guiasPorFazer().length : 0;
+    $('#numGuias').hidden = !n; $('#numGuias').textContent = n;
+    $('#listaGuias').innerHTML = lista.length ? lista.map((g) => {
+      const van = dados.carrinhas.find((c) => c.id === g.carrinhaId);
+      const pronta = g.estado === 'Pronta';
+      const quem = this.membros.find((m) => m.id === g.membroId)?.nome || g.nome || '';
+      return `<div class="item guia ${pronta ? 'pronta' : 'pedida'}"><div class="info">
+          <div class="titulo">${esc(g.carga)}${g.quantidade ? ` <small>· ${esc(g.quantidade)}</small>` : ''}</div>
+          <div class="sub">${dataPT(g.data)} · ${esc(g.origem || '?')} → ${esc(g.destino || '?')}${g.cliente ? ' · ' + esc(g.cliente) : ''}</div>
+          <div class="sub">🚚 ${esc(quem)}${van ? ` <span class="placa mini"><i>P</i><span>${esc(van.matricula)}</span></span>` : ''}${g.notas ? ' · ' + esc(g.notas) : ''}</div>
+          <div class="sub">${pronta
+            ? `<span class="badge ok">✓ Guia pronta${g.numero ? ' nº ' + esc(g.numero) : ''}</span><button class="badge neutro abrirFicheiro" data-caminho="${esc(g.ficheiro || '')}">📄 Abrir guia</button>`
+            : `<span class="badge medio">⏳ À espera da guia</span>${g.data <= hoje ? '<span class="badge mau">⛔ Não sair sem a guia</span>' : ''}`}
+            ${!this.meu(g) ? `<small>pedida por ${esc(this.nomeDe(g._por))}</small>` : ''}</div>
+          ${gere ? `<div class="botoes mini-botoes"><button class="mini ${pronta ? '' : 'ok'}" data-guia-pdf="${g.id}">📎 ${pronta ? 'Trocar o PDF' : 'Anexar a guia (PDF)'}</button></div>` : ''}
+        </div>
+        <div class="direita">${this.podeEditar('guias', g) ? btnEditar('guias', g.id) + btnApagar('guias', g.id) : ''}</div></div>`;
+    }).join('') : vazioMsg(this.filtroGuias === 'todas' ? 'Ainda não há guias.' : '👍 Nenhuma guia por fazer.');
+  },
+
   /* ----- Pessoas ----- */
   async guardarPessoa(f, editId) {
     if (!telValido(f.telefone)) { aviso('❌ O telemóvel não parece certo (ex: 912 345 678).'); return false; }
@@ -495,7 +568,7 @@ const Equipa = {
   perfilCompleto(m = this.eu) { return !!(m?.telefone && m?.data_nascimento); },
   async guardarMeusDocs(f) {
     const { error } = await this.cli().rpc('atualizar_meus_documentos', {
-      p_carta: f.carta_validade || null, p_categorias: (f.carta_categorias || '').trim().toUpperCase(), p_cqm: f.cqm_validade || null,
+      p_carta: f.carta_validade || null, p_categorias: (f.carta_categorias || '').trim().toUpperCase(), p_cqm: this.eu?.cqm_validade || null,
       p_tacografo: f.tacografo_validade || null, p_exame: f.exame_medico_validade || null,
     });
     if (error) {
@@ -645,6 +718,25 @@ const Equipa = {
         sub: `${dados.carrinhas.find((c) => c.id === o.carrinhaId)?.matricula || ''} · ${this.nomeDe(o._por)} · ${o.estado}`,
       }));
     }
+    // 📄 Guias: o RH vê as que faltam fazer; o condutor não sai sem a guia
+    if (this.pode('guias_fazer')) {
+      const falta = this.guiasPorFazer();
+      if (falta.length) {
+        const urg = falta.filter((g) => g.data <= hojeISO()).length;
+        out.push({ cls: urg ? 'mau' : 'medio', icone: '📄', txt: `${falta.length} guia${falta.length > 1 ? 's' : ''} por fazer${urg ? ` (${urg} para hoje)` : ''}`,
+          sub: falta.slice(0, 3).map((g) => `${dataPT(g.data).slice(0, 5)} ${g.carga}`).join(' · '), ir: 'equipa', foco: 'listaGuias' });
+      }
+    }
+    {
+      const hojeG = hojeISO();
+      const amanhaG = (() => { const d = new Date(hojeG + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+      (dados.guias || []).filter((g) => this.minhaGuia(g) && (g.data === hojeG || g.data === amanhaG)).sort((a, b) => a.data.localeCompare(b.data)).forEach((g) => {
+        const q = g.data === hojeG ? 'hoje' : 'amanhã';
+        out.push(g.estado === 'Pronta'
+          ? { cls: 'ok', icone: '📄', txt: `Guia de ${q} pronta: ${g.carga}`, sub: `${g.origem || ''} → ${g.destino || ''} · toque para abrir`, ir: 'equipa', foco: 'listaGuias' }
+          : { cls: 'mau', icone: '⛔', txt: `A guia de ${q} ainda não está pronta`, sub: `${g.carga} · não saia do local de carga sem a guia`, ir: 'equipa', foco: 'listaGuias' });
+      });
+    }
     // 👤 Dados em falta (a própria pessoa e o RH)
     if (this.eu && !this.perfilCompleto()) {
       out.push({ cls: 'medio', icone: '👤', txt: 'Complete os seus dados: telemóvel e data de nascimento', sub: 'Toque aqui → Equipa → Os meus dados', ir: 'equipa', foco: 'detMeuPerfil' });
@@ -765,12 +857,14 @@ const Equipa = {
 
     this.desenharPainelPessoal();
     this.desenharOcorrencias();
+    this.desenharGuias();
     this.desenharFerias();
     this.desenharPessoas();
     this.desenharPermissoes();
 
     if (this.pode('ferias_aprovar')) numEquipa += dados.ferias.filter((f) => f.estado === 'Pendente').length;
     if (this.gereProblemas()) numEquipa += dados.ocorrencias.filter((o) => o.estado === 'Aberto').length;
+    if (this.pode('guias_fazer')) numEquipa += this.guiasPorFazer().length;
     $('#numEquipa').hidden = !numEquipa;
     $('#numEquipa').textContent = numEquipa > 9 ? '9+' : numEquipa;
   },
@@ -832,12 +926,29 @@ const Equipa = {
     // ---- Hoje (toda a gente) ----
     const hojeLinhas = [];
     meusTurnos.filter((t) => t.data === hoje || t.data === amanha).forEach((t) => hojeLinhas.push(linha(`📅 ${t.data === hoje ? 'Hoje' : 'Amanhã'} tem turno`, `${t.inicio}–${t.fim}`, [vanDe(t.carrinhaId)?.matricula, t.notas].filter(Boolean).map(esc).join(' · '))));
+    (dados.guias || []).filter((g) => this.minhaGuia(g) && (g.data === hoje || g.data === amanha)).sort((a, b) => a.data.localeCompare(b.data)).forEach((g) => {
+      const q = g.data === hoje ? 'Hoje' : 'Amanhã';
+      hojeLinhas.push(g.estado === 'Pronta'
+        ? `<div class="l"><span>📄 ${q}: guia pronta<small>${esc(g.carga)} · ${esc(g.origem || '')} → ${esc(g.destino || '')}</small></span><b><button class="mini abrirFicheiro" data-caminho="${esc(g.ficheiro || '')}">Abrir</button></b></div>`
+        : `<div class="l alerta-guia"><span>⛔ ${q}: guia ainda não está pronta<small>${esc(g.carga)} · não saia do local de carga sem ela</small></span><b>⏳</b></div>`);
+    });
     if (ausentesHoje.length) hojeLinhas.push(linha('🏖️ Ausentes hoje', '', esc([...new Set(ausentesHoje.map((f) => this.nomeDe(f._por)))].join(', '))));
     this.membros.filter((m) => m.data_nascimento && String(m.data_nascimento).slice(5, 10) === hoje.slice(5)).forEach((m) => hojeLinhas.push(linha(`🎂 Hoje faz anos: ${esc(m.nome)}`, '')));
     const minhaFeria = dados.ferias.filter((f) => this.meu(f) && ['Pendente', 'Aprovado'].includes(f.estado) && f.fim >= hoje).sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
     if (minhaFeria) hojeLinhas.push(linha(`🏖️ As minhas ${minhaFeria.tipo.toLowerCase()}`, minhaFeria.estado === 'Pendente' ? '⏳ à espera' : '✓ aprovadas', `${dataPT(minhaFeria.inicio)} → ${dataPT(minhaFeria.fim)}`));
     blocos.push(bloco(`☀️ Hoje · ${DIAS_SEMANA_CURTO[new Date(hoje + 'T00:00:00').getDay()]} ${dataPT(hoje).slice(0, 5)}`, hojeLinhas.join('') || '<div class="vazio-mini">Nada marcado para hoje.</div>',
       escalas.length ? ir('equipa', 'listaEscalas', 'Escala ›') : '', 'destaque-bloco'));
+
+    // ---- Guias (RH faz; logística acompanha) ----
+    if (this.pode('guias_fazer') || this.pode('guias_ver_todas')) {
+      const gs = (dados.guias || []).filter((g) => g.estado !== 'Pronta' || (g.data >= hoje && g.data <= amanha))
+        .sort((a, b) => (a.estado === 'Pronta') - (b.estado === 'Pronta') || a.data.localeCompare(b.data)).slice(0, 5);
+      if (gs.length || this.pode('guias_fazer')) {
+        blocos.push(bloco('📄 Guias de transporte', gs.length ? gs.map((g) => linha(`${g.estado === 'Pronta' ? '✅' : '⏳'} ${esc(g.carga)}`, quando(g.data),
+          `${esc(this.membros.find((m) => m.id === g.membroId)?.nome || g.nome || '')} · ${esc(g.origem || '?')} → ${esc(g.destino || '?')}${g.estado === 'Pronta' ? '' : ' · por fazer'}`)).join('')
+          : '<div class="vazio-mini">👍 Nenhuma guia por fazer.</div>', ir('equipa', 'listaGuias', 'Guias ›')));
+      }
+    }
 
     // ---- A minha carrinha (quem conduz) ----
     if (fazViagens && !fin) {
@@ -1073,6 +1184,37 @@ ligarFormulario('#formOcorrencias', 'ocorrencias', (f, editId) => {
   };
 }, '⚠️ Aviso enviado. Obrigado!');
 
+ligarFormulario('#formGuias', 'guias', (f, editId) => {
+  const antiga = editId ? dados.guias.find((x) => x.id === editId) : null;
+  const id = editId || novoId();
+  const membro = Equipa.membros.find((m) => m.id === f.membroId) || Equipa.eu;
+  const gere = Equipa.pode('guias_fazer');
+  const ficheiro = gere && f.guiaFile && f.guiaFile.size ? f.guiaFile : null;
+  if (ficheiro) {
+    if (!Nuvem.user) { aviso('Para anexar a guia, entre na conta.'); return null; }
+    setTimeout(() => Equipa.enviarGuia(id, ficheiro), 0);
+  }
+  return {
+    id, data: f.data, membroId: membro?.id || null, userId: membro?.user_id || null, nome: membro?.nome || '',
+    carrinhaId: f.carrinhaId || '', carga: f.carga.trim(), quantidade: (f.quantidade || '').trim(), origem: f.origem.trim(), destino: (f.destino || '').trim(),
+    cliente: (f.cliente || '').trim(), notas: (f.notas || '').trim(), numero: gere ? (f.numero || '').trim() : antiga?.numero || '',
+    estado: antiga?.estado || 'Pedida', ficheiro: antiga?.ficheiro || null, ficheiroNome: antiga?.ficheiroNome || null,
+    feitaPor: antiga?.feitaPor || '', feitaEm: antiga?.feitaEm || '', pedidaEm: antiga?.pedidaEm || hojeISO(),
+  };
+}, '📄 Pedido de guia enviado ao RH');
+$('#filtroGuias').addEventListener('click', (e) => {
+  const c = e.target.closest('.chip');
+  if (c) { Equipa.filtroGuias = c.dataset.f; Equipa.desenharGuias(); }
+});
+$('#inputGuiaPdf').addEventListener('change', (e) => {
+  const fich = e.target.files[0], id = e.target.dataset.id;
+  e.target.value = '';
+  if (!fich || !id) return;
+  const g = dados.guias.find((x) => x.id === id);
+  const numero = prompt('Nº da guia (opcional):', g?.numero || '');
+  Equipa.enviarGuia(id, fich, numero === null ? undefined : numero.trim());
+});
+
 ligarFormulario('#formFerias', 'ferias', (f) => {
   if (f.fim < f.inicio) { aviso('A data "Até" tem de ser igual ou depois de "De".'); return null; }
   const dias = diasUteis(f.inicio, f.fim);
@@ -1143,6 +1285,8 @@ document.addEventListener('click', (e) => {
       if (el.tagName === 'DETAILS') el.open = true;
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
+  } else if (d.guiaPdf) {
+    const inp = $('#inputGuiaPdf'); inp.dataset.id = d.guiaPdf; inp.click();
   } else if (d.oc) Equipa.mudarOcorrencia(d.oc, d.estado);
   else if (d.ferDecidir) Equipa.decidirFerias(d.ferDecidir, d.aprovar === '1');
   else if (d.ferCancelar) {
@@ -1155,7 +1299,7 @@ document.addEventListener('click', (e) => {
     const form = $('#formPessoas');
     if (!m) return;
     ['nome', 'email', 'telefone', 'papel', 'dias_ferias', 'data_entrada', 'data_nascimento', 'contacto_emergencia',
-      'carta_validade', 'carta_categorias', 'cqm_validade', 'tacografo_validade', 'exame_medico_validade'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
+      'carta_validade', 'carta_categorias', 'tacografo_validade', 'exame_medico_validade'].forEach((k) => { form.elements[k].value = m[k] ?? ''; });
     form.dataset.editId = m.id;
     $('#blocoSenhaInicial').hidden = !!m.user_id;
     form.querySelector('.tituloForm').textContent = '✏️ A editar ' + m.nome;

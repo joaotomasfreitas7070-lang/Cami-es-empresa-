@@ -85,8 +85,14 @@ seguro/inspeção/IUC a terminar, pedidos por aprovar e problemas abertos.
 ## 🧭 Painel por papel e documentos do condutor (atualização 4)
 Correr `supabase/equipa-4.sql` no Supabase (uma vez) e voltar a publicar a função (Edge Functions → notificar → Code → colar `supabase/functions/notificar/index.ts` → Deploy, com "Verify JWT" desligado).
 - **Painel** mostra o que interessa a cada papel: condutor (turno de hoje, a sua carrinha, últimas viagens), logística (escala do dia, estado da frota), RH (aniversários, ausências, salários do mês, documentos a tratar), patrão/contabilidade (tudo + finanças).
-- **Documentos do condutor**: validade da carta (e categorias), CQM/CAM, cartão de tacógrafo e exame médico. Preenche-se em Equipa → Pessoas ("Documentos de condução") ou pelo próprio em Equipa → "🪪 Os meus documentos".
+- **Documentos do condutor**: validade da carta (e categorias), cartão de tacógrafo e exame médico. Preenche-se em Equipa → Pessoas ("Documentos de condução") ou pelo próprio em Equipa → "🪪 Os meus documentos".
 - Avisos no site e notificação diária aos 60, 30 e 7 dias, no dia e depois de expirar; a escala avisa se o condutor tem a carta expirada.
+
+## 📄 Guias de transporte e documentos das viagens (atualização 5)
+Correr `supabase/equipa-5.sql` no Supabase (uma vez) e voltar a publicar a função `notificar`.
+- **Guias** (Equipa → 📄 Guias): o condutor ou a logística pedem a guia e dizem a carga, o dia e o local. O RH anexa o PDF (e o nº). O condutor e a logística são avisados. Enquanto não estiver pronta, o condutor vê "⛔ não saia do local de carga sem a guia".
+- Permissões novas: `guias_pedir` (condutor, logística), `guias_fazer` (RH) e `guias_ver_todas` (logística).
+- **Viagens → 📎 Outros documentos**: CMR, contrato de transporte, comprovativo de entrega… Pode juntar vários ficheiros a cada viagem; quem vê a viagem vê os documentos.
 
 ## 🏠 Casas das Obras (site à parte)
 Fotos semanais das casas das obras, com regras e avisos aos encarregados: ver [`obras/README.md`](obras/README.md).

@@ -21,7 +21,7 @@ function normalizar(d, semPadroes = false) {
   const out = {
     carrinhas: d.carrinhas || [], viagens: d.viagens || [], abastecimentos: d.abastecimentos || [],
     despesas: d.despesas || [], ferias: d.ferias || [], ocorrencias: d.ocorrencias || [],
-    salarios: d.salarios || [], processamentos: d.processamentos || [], clientes: d.clientes || [], escalas: d.escalas || [],
+    salarios: d.salarios || [], processamentos: d.processamentos || [], clientes: d.clientes || [], escalas: d.escalas || [], guias: d.guias || [],
     custosFixos: d.custosFixos || (semPadroes ? [] : FIXOS_BASE.map(([nome, valor]) => ({ id: novoId(), nome, valor, periodo: 'Mensal' }))),
     parametros: { ...PARAMETROS_BASE, ...(d.parametros || {}) },
     ultimaCopia: d.ultimaCopia || null,
@@ -444,6 +444,7 @@ function desenharListas() {
         <div class="sub">${precos && c.aval ? `<span class="badge ${c.aval.cls}">${c.aval.txt}</span> ` : ''}
           ${precos ? `<button class="badge estado ${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[0]}" data-id="${v.id}">${(ESTADO_UI[v.estado] || ESTADO_UI.Pendente)[1]}</button>` : ''}
           ${precos && v.faturaFicheiro ? `<button class="badge neutro abrirFatura" data-id="${v.id}">📄 Fatura${v.fatura ? ' ' + esc(v.fatura) : ''}</button>` : ''}
+          ${(v.anexos || []).map((a) => `<button class="badge neutro abrirFicheiro" data-caminho="${esc(a.caminho)}">📎 ${esc(a.tipo)}</button>`).join('')}
           ${v.notas ? ' ' + esc(v.notas) : ''}</div>
       </div>
       <div class="direita">${precos ? `<span class="valor">${euro(v.receita)}</span>
@@ -540,7 +541,7 @@ const FORMS = {};
 
 function sairEdicao(form) {
   delete form.dataset.editId;
-  if (form.id === 'formViagens') $('#faturaInfo').textContent = 'Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.';
+  if (form.id === 'formViagens') { $('#faturaInfo').textContent = 'Fica guardada na internet. Depois basta tocar em "📄 Fatura" na viagem para a abrir.'; $('#anexosViagem').innerHTML = ''; }
   form.reset();
   if (form.elements.data) form.elements.data.value = hojeISO();
   const t = form.querySelector('.tituloForm');
@@ -592,6 +593,7 @@ function editar(tipo, id) {
     form.elements.receita.value = reg.receita || '';
   }
   if (tipo === 'viagens') {
+    desenharAnexosForm(reg);
     $('#faturaInfo').textContent = reg.faturaFicheiro
       ? `Fatura guardada: ${reg.faturaNome || 'ficheiro'}. Escolha outro ficheiro só se a quiser substituir.`
       : 'Ainda sem fatura. Escolha o PDF ou tire uma foto.';
@@ -603,13 +605,28 @@ function editar(tipo, id) {
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function anexosDoForm(id) {
+  const fs = [...($('#formViagens').elements.anexoFiles.files || [])];
+  if (!fs.length) return true;
+  if (!Nuvem.user) { aviso('Para guardar documentos, entre na conta.'); return false; }
+  const tipo = $('#formViagens').elements.tipoDoc.value;
+  setTimeout(() => Nuvem.enviarAnexos(id, fs, tipo), 0);
+  return true;
+}
+function desenharAnexosForm(v) {
+  $('#anexosViagem').innerHTML = (v?.anexos || []).map((a, i) => `<span class="badge neutro anexo"><button type="button" class="abrirFicheiro" data-caminho="${esc(a.caminho)}" style="background:none;border:0;color:inherit;padding:0">📎 ${esc(a.tipo)}: ${esc(a.nome || '')}</button>
+    <button type="button" class="tirar" data-anexo-tirar="${i}" aria-label="Tirar">✕</button></span>`).join('');
+}
+
 ligarFormulario('#formViagens', 'viagens', (f, editId) => {
   const antigaV = editId ? dados.viagens.find((x) => x.id === editId) : null;
   if (!pode('precos')) {
+    const idV = editId || novoId();
+    if (!anexosDoForm(idV)) return null;
     // Quem não vê preços (ex: condutor) regista só a viagem; os valores ficam para a contabilidade/logística.
     const base = antigaV || { tipoPreco: 'km', receita: 0, precoKm: null, estado: 'Pendente', fatura: '', faturaFicheiro: null, faturaNome: null };
     return {
-      tipoPreco: base.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(),
+      id: idV, anexos: antigaV?.anexos || [], tipoPreco: base.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(),
       destino: f.destino.trim(), kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita: N(base.receita), precoKm: base.precoKm ?? null,
       portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros), fatura: base.fatura || '', estado: base.estado || 'Pendente',
       notas: f.notas.trim(), faturaFicheiro: base.faturaFicheiro || null, faturaNome: base.faturaNome || null,
@@ -627,8 +644,9 @@ ligarFormulario('#formViagens', 'viagens', (f, editId) => {
     if (!Nuvem.user) { aviso('Para guardar a fatura, entre na conta em ⚙️ Mais.'); return null; }
     setTimeout(() => Nuvem.enviarFatura(id, ficheiro), 0);
   }
+  if (!anexosDoForm(id)) return null;
   return {
-  id, tipoPreco: f.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
+  id, anexos: antiga?.anexos || [], tipoPreco: f.tipoPreco, data: f.data, carrinhaId: f.carrinhaId || '', cliente: f.cliente.trim(), origem: f.origem.trim(), destino: f.destino.trim(),
   kmCarregado: N(f.kmCarregado), kmVazio: N(f.kmVazio), receita, precoKm: f.tipoPreco === 'km' ? N(f.precoKm) : null,
   portagens: N(f.portagens), alimentacao: N(f.alimentacao), outros: N(f.outros),
   fatura: f.fatura.trim(), estado: f.estado, notas: f.notas.trim(),
@@ -731,6 +749,16 @@ document.addEventListener('click', (e) => {
     guardar(); desenhar(); aviso(v.estado === 'Pago' ? '✓ Marcada como paga' : v.estado === 'Pago 50%' ? '◐ Marcada como paga a 50%' : 'Marcada como por cobrar');
     return;
   }
+  const tirar = e.target.closest('[data-anexo-tirar]');
+  if (tirar) {
+    const v = dados.viagens.find((x) => x.id === $('#formViagens').dataset.editId);
+    const a = v?.anexos?.[Number(tirar.dataset.anexoTirar)];
+    if (!a || !confirm(`Tirar "${a.tipo}: ${a.nome}" desta viagem?`)) return;
+    v.anexos = v.anexos.filter((x) => x !== a);
+    Nuvem.apagarFatura(a.caminho);
+    guardar(); desenhar(); desenharAnexosForm(v); aviso('Documento retirado');
+    return;
+  }
   const fat = e.target.closest('.abrirFatura');
   if (fat) { Nuvem.abrirFatura(dados.viagens.find((x) => x.id === fat.dataset.id)); return; }
   const ed = e.target.closest('.editar');
@@ -745,7 +773,12 @@ document.addEventListener('click', (e) => {
     dados.abastecimentos = dados.abastecimentos.filter((a) => a.carrinhaId !== id);
     ['despesas', 'viagens'].forEach((k) => dados[k].forEach((x) => { if (x.carrinhaId === id) x.carrinhaId = ''; }));
   } else if (!confirm('Apagar este registo?')) return;
-  if (tipo === 'viagens') { const v = dados.viagens.find((x) => x.id === id); if (v?.faturaFicheiro) Nuvem.apagarFatura(v.faturaFicheiro); }
+  if (tipo === 'viagens') {
+    const v = dados.viagens.find((x) => x.id === id);
+    if (v?.faturaFicheiro) Nuvem.apagarFatura(v.faturaFicheiro);
+    (v?.anexos || []).forEach((a) => Nuvem.apagarFatura(a.caminho));
+  }
+  if (tipo === 'guias') { const g = dados.guias.find((x) => x.id === id); if (g?.ficheiro) Nuvem.apagarFatura(g.ficheiro); }
   dados[tipo] = dados[tipo].filter((x) => x.id !== id);
   if (FORMS[tipo]?.dataset.editId === id) sairEdicao(FORMS[tipo]);
   guardar(); desenhar(); aviso('Apagado');
@@ -936,6 +969,24 @@ const Nuvem = {
     v.faturaFicheiro = caminho; v.faturaNome = ficheiro.name;
     guardar(); desenhar(); aviso('📄 Fatura guardada');
     if (anterior && anterior !== caminho) this.apagarFatura(anterior);
+  },
+
+  async enviarAnexos(viagemId, ficheiros, tipo) {
+    if (!this.user) return;
+    aviso(`📤 A enviar ${ficheiros.length > 1 ? ficheiros.length + ' documentos' : 'o documento'}…`);
+    const novos = [];
+    for (const [i, fich] of ficheiros.entries()) {
+      const ext = (fich.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+      const caminho = `${Equipa.pasta('viagens')}/${viagemId}-${Date.now()}-${i}.${ext}`;
+      const { error } = await this.cliente.storage.from('faturas').upload(caminho, fich, { contentType: fich.type || undefined, upsert: true });
+      if (error) { aviso('❌ Documento não enviado: ' + error.message); continue; }
+      novos.push({ caminho, nome: fich.name, tipo, em: hojeISO() });
+    }
+    const v = dados.viagens.find((x) => x.id === viagemId);
+    if (!v || !novos.length) return;
+    v.anexos = [...(v.anexos || []), ...novos];
+    guardar(); desenhar(); aviso(`📎 ${novos.length > 1 ? novos.length + ' documentos guardados' : tipo + ' guardado'}`);
+    if ($('#formViagens').dataset.editId === viagemId) desenharAnexosForm(v);
   },
 
   async abrirFatura(v) {

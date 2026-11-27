@@ -120,6 +120,22 @@ async function registo(ev: any) {
         return enviar([d.userId], { titulo: '🧾 Recibo disponível', corpo: `O seu recibo de ${nomeMes(d.mes)} já está no site.`, tag: 'rec-' + ev.id });
       }
       return 0;
+    case 'guias': {
+      const quem = d.nome || eq.nome(d.userId);
+      if (ev.op === 'INSERT' && d.estado !== 'Pronta') {
+        return enviar(semAutor(eq.com('guias_fazer')), {
+          titulo: `📄 Pedido de guia para ${dataPT(d.data)}`,
+          corpo: `${d.carga}${d.quantidade ? ' (' + d.quantidade + ')' : ''} · ${d.origem || '?'} → ${d.destino || '?'} · condutor ${quem}. Toque para fazer a guia.`,
+          urgente: d.data <= diaPT(), tag: 'guia-' + ev.id });
+      }
+      if (d.estado === 'Pronta' && ev.antes !== 'Pronta') {
+        const rh = eq.com('guias_fazer');
+        return enviar([d.userId, autor, ...eq.com('guias_ver_todas')].filter((u) => u && (u === d.userId || !rh.includes(u))), {
+          titulo: `📄 Guia pronta para ${dataPT(d.data)}`,
+          corpo: `${d.carga} · ${d.origem || '?'} → ${d.destino || '?'} (${quem}). Abra no site antes de sair do local de carga.`, tag: 'guia-' + ev.id });
+      }
+      return 0;
+    }
     case 'escalas':
       // vários turnos marcados de uma vez → uma só notificação
       if (ev.op === 'INSERT' && d.userId && d.userId !== autor && await umaVez(`esc:${d.userId}:${new Date().toISOString().slice(0, 16)}`)) {
@@ -138,7 +154,7 @@ async function diario() {
   for (const { id: e } of await sql`select id from public.empresas`) {
     const eq = await equipa(e);
     const regs = await sql`select tipo, dados, criado_por from public.registos
-      where empresa_id = ${e} and not apagado and tipo in ('ferias', 'ocorrencias', 'carrinhas', 'escalas')`;
+      where empresa_id = ${e} and not apagado and tipo in ('ferias', 'ocorrencias', 'carrinhas', 'escalas', 'guias')`;
     const linhas = new Map<string, string[]>();
     const juntar = (ids: string[], txt: string) => ids.forEach((u) => { if (!linhas.has(u)) linhas.set(u, []); linhas.get(u)!.push(txt); });
 
@@ -148,7 +164,7 @@ async function diario() {
       if (m.nasc.slice(5) === amanha.slice(5)) juntar(quem, `🎂 Amanhã é o aniversário de ${m.nome}`);
       if (m.nasc.slice(5) === hoje.slice(5)) juntar(quem, `🎂 Hoje é o aniversário de ${m.nome}`);
     }
-    let pendentes = 0, paradas = 0, abertos = 0;
+    let pendentes = 0, paradas = 0, abertos = 0, porFazer = 0;
     for (const r of regs) {
       const d = r.dados;
       if (r.tipo === 'ferias' && d.estado === 'Pendente') pendentes++;
@@ -157,6 +173,10 @@ async function diario() {
           `🏖️ ${eq.nome(r.criado_por)}: ${String(d.tipo).toLowerCase()} a partir de ${d.inicio === amanha ? 'amanhã' : dataPT(d.inicio)}`);
       }
       if (r.tipo === 'escalas' && d.data === hoje && d.userId) juntar([d.userId], `📅 Hoje tem turno das ${d.inicio} às ${d.fim}`);
+      if (r.tipo === 'guias' && d.estado !== 'Pronta' && d.data <= amanha) porFazer++;
+      if (r.tipo === 'guias' && d.data === hoje && d.userId) {
+        juntar([d.userId], d.estado === 'Pronta' ? `📄 A guia de hoje está pronta: ${d.carga}` : `⛔ A guia de hoje (${d.carga}) ainda não está pronta — não saia sem ela`);
+      }
       if (r.tipo === 'ocorrencias' && d.estado !== 'Resolvido') { abertos++; if (d.urgencia === 'alta') paradas++; }
       if (r.tipo === 'carrinhas') {
         for (const [campo, nome] of DOCS) {
@@ -169,11 +189,11 @@ async function diario() {
       }
     }
     // Documentos de condução a terminar (60, 30, 7 dias, no dia e no dia seguinte a expirar)
-    const docsPessoas = await sql`select user_id, nome, to_jsonb(m) ->> 'carta_validade' as carta, to_jsonb(m) ->> 'cqm_validade' as cqm,
+    const docsPessoas = await sql`select user_id, nome, to_jsonb(m) ->> 'carta_validade' as carta,
       to_jsonb(m) ->> 'tacografo_validade' as tacografo, to_jsonb(m) ->> 'exame_medico_validade' as exame from public.membros m where empresa_id = ${e}`;
     const gestores = eq.com('pessoas_gerir', 'escalas_gerir');
     for (const m of docsPessoas) {
-      for (const [campo, nome] of [['carta', 'Carta de condução'], ['cqm', 'CQM / CAM'], ['tacografo', 'Cartão de tacógrafo'], ['exame', 'Exame médico']]) {
+      for (const [campo, nome] of [['carta', 'Carta de condução'], ['tacografo', 'Cartão de tacógrafo'], ['exame', 'Exame médico']]) {
         if (!m[campo]) continue;
         const dias = diasEntre(hoje, m[campo]);
         if (![60, 30, 7, 0, -1].includes(dias)) continue;
@@ -182,6 +202,7 @@ async function diario() {
         juntar(gestores.filter((u) => u !== m.user_id), `🪪 ${m.nome}: ${nome.toLowerCase()} ${quando}`);
       }
     }
+    if (porFazer) juntar(eq.com('guias_fazer'), `📄 ${porFazer} guia${porFazer > 1 ? 's' : ''} por fazer para hoje/amanhã`);
     if (pendentes) juntar(eq.com('ferias_aprovar'), `🏖️ ${pendentes} pedido${pendentes > 1 ? 's' : ''} de férias por aprovar`);
     if (abertos) juntar(eq.com('ocorrencias_gerir'), paradas ? `🔴 ${paradas} carrinha${paradas > 1 ? 's' : ''} parada${paradas > 1 ? 's' : ''} · ${abertos} problema${abertos > 1 ? 's' : ''} por resolver` : `🔧 ${abertos} problema${abertos > 1 ? 's' : ''} por resolver`);
 
