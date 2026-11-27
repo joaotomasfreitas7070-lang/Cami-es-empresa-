@@ -4,12 +4,14 @@
 const CHAVE = 'gestao-frota-v1';
 
 const PARAMETROS_BASE = {
-  precoObjetivo: 0.85, reserva: 0.10, consumo: 7, precoGasoleo: 2.10,
+  precoObjetivo: 0.85, reserva: 0.08, consumo: 7, precoGasoleo: 2.10,
   ordenado: 1000, ss: 11, irs: 15, encargos: 25.675, subsidios: '1',
 };
 const FIXOS_BASE = [
-  ['Seguro da carrinha', 200], ['Seguro de mercadorias (CMR)', 0], ['IUC', 12], ['Inspeção periódica', 8],
-  ['Contabilista', 80], ['Wtransnet (cargas)', 40], ['Claude Pro', 22], ['Outros fixos', 50],
+  // Seguros: valores provisórios até chegarem as cotações
+  ['Seguro da carrinha', 150], ['Seguro de mercadorias (CMR)', 100], ['Seguro de responsabilidade civil', 50],
+  ['Seguro de acidentes de trabalho', 50], ['Contabilista', 60], ['IUC e inspeção (provisão)', 15],
+  ['Claude Pro', 22], ['Outros fixos', 40],
 ];
 const CATEGORIAS_RESERVA = ['Manutenção / revisão', 'Pneus', 'Avaria / reparação', 'Manutenção'];
 
